@@ -68,6 +68,7 @@ function doPost(e) {
       case "uploadVideo":   result = uploadVideo(body.data);  break;
       case "cleanupVideos": result = cleanupOldVideos();      break;
       case "searchVideo":   result = searchVideo(body.data);  break;
+      case "deleteVideo":   result = deleteVideo(body.data);  break;
       default: result = { error: "Unknown action: " + action };
     }
   } catch (err) {
@@ -215,4 +216,43 @@ function setupDailyVideoCleanupTrigger() {
     if (t.getHandlerFunction() === "cleanupOldVideos") ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger("cleanupOldVideos").timeBased().atHour(3).everyDays(1).create();
+}
+
+/**
+ * Action "deleteVideo" — xoá video theo mã vận đơn
+ * data: { trackingCode }
+ */
+function deleteVideo(data) {
+  if (!data || !data.trackingCode) {
+    return { error: "Thiếu mã vận đơn (trackingCode)" };
+  }
+
+  try {
+    const sheet = ensureVideoLogSheet();
+    const rows = sheet.getDataRange().getValues();
+    const targetCode = data.trackingCode.toString().trim().toLowerCase();
+    
+    // Duyệt ngược để xoá đúng video mới nhất nếu có trùng mã
+    for (let i = rows.length - 1; i >= 1; i--) {
+      const row = rows[i];
+      const codeInSheet = row[1].toString().trim().toLowerCase(); // trackingCode ở cột B (index 1)
+      
+      if (codeInSheet === targetCode) {
+        const fileId = row[4]; // fileId ở cột E (index 4)
+        if (fileId) {
+          try {
+            DriveApp.getFileById(fileId).setTrashed(true);
+          } catch (e) {
+            console.warn("Lỗi xoá file Drive (có thể đã xoá): " + e.message);
+          }
+        }
+        sheet.deleteRow(i + 1); // Row index trong Sheets bắt đầu từ 1
+        return { ok: true, message: "Đã xoá video thành công." };
+      }
+    }
+    
+    return { error: "Không tìm thấy mã vận đơn để xoá." };
+  } catch (err) {
+    return { error: "Lỗi xoá video: " + err.message };
+  }
 }
