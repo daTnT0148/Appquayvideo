@@ -13,10 +13,8 @@
 <link rel="icon" href="icon-192.png">
 <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0a0a;--card:#161616;--card2:#1e1e1e;--border:#2a2a2a;--text:#fff;--text-dim:#888;--amber:#f5b942;--red:#ef4444;--indigo:#6366f1;--green:#22c55e;--mono:'SFMono-Regular',Consolas,'Courier New',monospace;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;}
+:root{--bg:#0a0a0a;--card:#161616;--card2:#1e1e1e;--border:#2a2a2a;--text:#fff;--text-dim:#888;--amber:#f5b942;--red:#ef4444;--indigo:#6366f1;--green:#22c55e;--mono:'SFMono-Regular',Consolas,'Courier New',monospace;--sans:-apple-system,BlinkMacSystemFont,sans-serif;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
 html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100%;overscroll-behavior:none;overflow:hidden;}
 body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
@@ -25,7 +23,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 #viewHome{display:flex;flex-direction:column;height:100%;overflow-y:auto;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);}
 #viewHome.hidden{display:none;}
 .home-topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0;}
-.home-logo{font-size:20px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--amber),#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.home-logo{font-size:20px;font-weight:800;letter-spacing:-0.5px;color:var(--amber);}
 .install-badge{display:none;background:var(--indigo);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;}
 .install-badge.show{display:block;}
 .home-hero{padding:28px 20px 0;}
@@ -34,11 +32,10 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .search-card{margin:20px 20px 0;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;}
 .search-card-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-dim);margin-bottom:10px;}
 .search-row{display:flex;gap:10px;}
-.search-row input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:14px;color:var(--text);font-family:var(--mono);font-size:15px;padding:13px 14px;outline:none;transition:border-color .2s;}
+.search-row input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:14px;color:var(--text);font-family:var(--mono);font-size:15px;padding:13px 14px;outline:none;}
 .search-row input:focus{border-color:var(--amber);}
 .search-row button{background:var(--indigo);color:#fff;border:none;border-radius:14px;padding:0 20px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;}
-.search-row button:active{opacity:.8;}
-.search-result-card{margin:12px 20px 0;border-radius:16px;padding:16px;display:none;animation:fadeIn .25s ease;}
+.search-result-card{margin:12px 20px 0;border-radius:16px;padding:16px;display:none;}
 .search-result-card.show{display:block;}
 .search-result-card.found{background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);}
 .search-result-card.notfound{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);}
@@ -48,34 +45,31 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .result-drive-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--indigo);color:#fff;text-decoration:none;border-radius:12px;padding:12px;font-size:14px;font-weight:700;margin-top:14px;}
 .result-notfound-msg{color:var(--red);font-size:14px;font-weight:600;text-align:center;}
 .camera-cta{margin:20px 20px 0;padding-bottom:max(20px,env(safe-area-inset-bottom));}
-.btn-camera-big{width:100%;background:linear-gradient(135deg,var(--amber),#ff9500);color:#1a0e00;border:none;border-radius:20px;padding:22px;font-size:18px;font-weight:800;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 30px rgba(245,185,66,.25);transition:transform .15s,box-shadow .15s;}
-.btn-camera-big:active{transform:scale(.97);}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.btn-camera-big{width:100%;background:var(--amber);color:#1a0e00;border:none;border-radius:20px;padding:22px;font-size:18px;font-weight:800;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;}
 
 /* CAMERA VIEW */
 #viewCamera{display:none;position:fixed;inset:0;background:#000;z-index:100;}
 #viewCamera.active{display:block;}
-#srcVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;display:none;}
-#outputCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;}
+#srcVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;}
+#outputCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;display:none;}
 
 .gate{position:absolute;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:40px 32px;text-align:center;}
 .gate.hidden{display:none;}
 .gate-icon{font-size:64px;}
 .gate h2{font-size:22px;font-weight:800;}
 .gate p{font-size:14px;color:var(--text-dim);line-height:1.7;max-width:300px;}
-.btn-gate{background:linear-gradient(135deg,var(--amber),#ff9500);color:#1a0e00;border:none;border-radius:16px;padding:16px 36px;font-size:16px;font-weight:800;cursor:pointer;margin-top:8px;}
+.btn-gate{background:var(--amber);color:#1a0e00;border:none;border-radius:16px;padding:16px 36px;font-size:16px;font-weight:800;cursor:pointer;margin-top:8px;}
 
-.cam-hud-top{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px 12px;background:linear-gradient(to bottom,rgba(0,0,0,.65) 0%,transparent 100%);}
-.btn-back{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:none;border-radius:50px;color:#fff;font-size:14px;font-weight:600;padding:8px 14px;cursor:pointer;}
-.rec-chip{display:none;align-items:center;gap:7px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:7px 14px;border-radius:100px;font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;}
+.cam-hud-top{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px 12px;background:rgba(0,0,0,0.6);}
+.btn-back{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);border:none;border-radius:50px;color:#fff;font-size:14px;font-weight:600;padding:8px 14px;cursor:pointer;}
+.rec-chip{display:none;align-items:center;gap:7px;background:rgba(0,0,0,.7);padding:7px 14px;border-radius:100px;font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;}
 .rec-chip.show{display:flex;}
-.reddot{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulseRec 1s infinite;}
-@keyframes pulseRec{0%,100%{opacity:1}50%{opacity:.4}}
+.reddot{width:9px;height:9px;border-radius:50%;background:var(--red);}
+.reddot.blink{opacity:0.3;}
 
 .zoom-controls{display:none;flex-direction:column;gap:8px;position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:20;}
-.zoom-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;}
-.zoom-btn:active{background:rgba(255,255,255,.28);}
-.zoom-label{background:rgba(0,0,0,.5);backdrop-filter:blur(8px);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:20px;padding:4px 8px;text-align:center;min-width:44px;}
+.zoom-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.zoom-label{background:rgba(0,0,0,.6);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:20px;padding:4px 8px;text-align:center;min-width:44px;}
 
 .scan-reticle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72%;max-width:320px;aspect-ratio:1;pointer-events:none;z-index:10;}
 .scan-reticle .corner{position:absolute;width:28px;height:28px;border:3px solid var(--amber);opacity:.9;}
@@ -83,27 +77,25 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .scan-reticle .tr{top:0;right:0;border-left:none;border-bottom:none;border-radius:0 8px 0 0;}
 .scan-reticle .bl{bottom:0;left:0;border-right:none;border-top:none;border-radius:0 0 0 8px;}
 .scan-reticle .br{bottom:0;right:0;border-left:none;border-top:none;border-radius:0 0 8px 0;}
-.scan-line{position:absolute;left:4%;right:4%;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent);animation:scanMove 2.2s ease-in-out infinite;box-shadow:0 0 10px var(--amber);}
-@keyframes scanMove{0%,100%{top:8%}50%{top:90%}}
+.scan-line{position:absolute;left:4%;right:4%;height:2px;top:50%;background:var(--amber);}
 
-.scan-hint{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:20;white-space:nowrap;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:50px;padding:10px 20px;font-size:13px;color:rgba(255,255,255,.85);font-weight:500;display:flex;align-items:center;gap:10px;}
+.scan-hint{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:20;white-space:nowrap;background:rgba(0,0,0,.7);border-radius:50px;padding:10px 20px;font-size:13px;color:#fff;font-weight:500;display:flex;align-items:center;gap:10px;}
 .scan-hint.hidden{display:none;}
 .btn-manual{background:var(--amber);color:#1a0e00;border:none;border-radius:30px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;}
 
-.action-overlay{display:none;position:absolute;inset:0;z-index:25;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(32px,env(safe-area-inset-bottom));animation:fadeIn .3s ease;}
+.action-overlay{display:none;position:absolute;inset:0;z-index:25;background:rgba(0,0,0,.8);flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(32px,env(safe-area-inset-bottom));}
 .action-overlay.show{display:flex;}
 .action-sheet{width:100%;max-width:420px;padding:0 20px;display:flex;flex-direction:column;gap:10px;}
 .action-title{text-align:center;font-size:14px;color:rgba(255,255,255,.75);line-height:1.5;}
 .action-title strong{color:#fff;}
-.progress-wrap{width:100%;height:6px;background:rgba(255,255,255,.15);border-radius:100px;overflow:hidden;}
-.progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--indigo),#a5a8ff);transition:width .2s ease;border-radius:100px;}
+.progress-wrap{width:100%;height:6px;background:rgba(255,255,255,.2);border-radius:100px;overflow:hidden;}
+.progress-bar{height:100%;width:0%;background:var(--indigo);border-radius:100px;}
 .progress-text{text-align:center;font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.6);font-weight:700;}
-.btn-action{border:none;border-radius:18px;padding:18px;font-size:16px;font-weight:700;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:transform .1s,opacity .15s;width:100%;}
-.btn-action:active{transform:scale(.97);}
+.btn-action{border:none;border-radius:18px;padding:18px;font-size:16px;font-weight:700;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;width:100%;}
 .btn-action.green{background:var(--green);color:#06210f;}
 .btn-action.red{background:var(--red);color:#fff;}
 .btn-action.indigo{background:var(--indigo);color:#fff;}
-.btn-action.outline{background:transparent;border:1.5px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);}
+.btn-action.outline{background:transparent;border:1.5px solid rgba(255,255,255,.3);color:#fff;}
 .btn-row{display:flex;gap:10px;}
 .btn-row .btn-action{flex:1;}
 .video-link-action{display:flex;align-items:center;justify-content:center;gap:8px;color:#a5a8ff;text-decoration:none;font-size:13px;font-weight:600;padding:6px;}
@@ -138,6 +130,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 <div id="viewCamera">
   <video id="srcVideo" playsinline muted autoplay></video>
   <canvas id="outputCanvas"></canvas>
+  
   <div class="gate" id="gateStart">
     <div class="gate-icon">🎥</div>
     <h2>Bật camera</h2>
@@ -150,24 +143,29 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
     <p id="gateErrorMsg">Trình duyệt từ chối quyền camera. Vào cài đặt → Quyền → Camera → Cho phép, rồi thử lại.</p>
     <button class="btn-gate" id="btnRetryCamera">🔁 Thử lại</button>
   </div>
+  
   <div class="cam-hud-top">
     <button class="btn-back" id="btnBackHome">‹ Trang chủ</button>
-    <div class="rec-chip" id="recChip"><span class="reddot"></span><span id="recTimer">00:00</span></div>
+    <div class="rec-chip" id="recChip"><div class="reddot" id="reddot"></div><span id="recTimer">00:00</span></div>
   </div>
+  
   <div class="scan-reticle" id="scanReticle">
     <div class="corner tl"></div><div class="corner tr"></div>
     <div class="corner bl"></div><div class="corner br"></div>
-    <div class="scan-line"></div>
+    <div class="scan-line" id="scanLine"></div>
   </div>
+  
   <div class="zoom-controls" id="zoomControls">
     <button class="zoom-btn" id="btnZoomIn">＋</button>
     <div class="zoom-label" id="zoomLabel">1×</div>
     <button class="zoom-btn" id="btnZoomOut">－</button>
   </div>
+  
   <div class="scan-hint" id="scanHint">
     <span>Đưa mã QR vào khung</span>
     <button class="btn-manual" id="btnManualRecord">Quay thủ công</button>
   </div>
+  
   <div class="action-overlay" id="actionOverlay">
     <div class="action-sheet">
       <div id="uploadGroup" style="display:none;flex-direction:column;gap:8px;">
@@ -188,21 +186,45 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 </div>
 
 <script>
+// --- CONFIG & PWA ---
 const CONFIG={APPS_SCRIPT_URL:"https://script.google.com/macros/s/AKfycbxYhMs_MTxPkoVmf8j2iJl_B4Cg-wUOPFNYVkNCx8R2koMR7CmulxpLA8Kr5F7jDdN55Q/exec",SECRET_KEY:"Kntvntd482001!",AUTO_DELETE_DAYS:20};
 if("serviceWorker"in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("service-worker.js").catch(()=>{});});}
 let deferredInstallPrompt=null;
 window.addEventListener("beforeinstallprompt",(e)=>{e.preventDefault();deferredInstallPrompt=e;document.getElementById("btnInstall").classList.add("show");});
 document.getElementById("btnInstall").addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;document.getElementById("btnInstall").classList.remove("show");});
 window.addEventListener("appinstalled",()=>document.getElementById("btnInstall").classList.remove("show"));
+
+// --- STATE & VARS ---
 let appState="home",mediaStream=null,currentTrack=null,zoomLevel=1,zoomMin=1,zoomMax=5,zoomStep=0.5;
-const srcVideo=document.getElementById("srcVideo"),outputCanvas=document.getElementById("outputCanvas"),ctx=outputCanvas.getContext("2d");
-let codeReader=null,scanningActive=false,lastScanTime=0,mediaRecorder=null,recordedChunks=[],recordedBlob=null,recordStartTs=0,recTimerInterval=null,currentTrackingCode="",pendingUploadTrackingCode="";
+const srcVideo=document.getElementById("srcVideo"), outputCanvas=document.getElementById("outputCanvas");
+const ctx=outputCanvas.getContext("2d",{alpha:false}); // Optimization
+
+let codeReader=null, scanningActive=false, scanInterval=null;
+let mediaRecorder=null, recordedChunks=[], recordedBlob=null;
+let recordStartTs=0, recTimerInterval=null, currentTrackingCode="", pendingUploadTrackingCode="";
 let wakeLock=null;
 async function requestWakeLock(){try{if("wakeLock"in navigator)wakeLock=await navigator.wakeLock.request("screen");}catch(e){}}
 function releaseWakeLock(){if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null;}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&appState==="recording")requestWakeLock();});
+
+// --- UTILS ---
 let audioCtx=null;
-function beep(times=1,freq=800,dur=0.2,gap=0.1){try{audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();let t=audioCtx.currentTime;for(let i=0;i<times;i++){const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type="sine";osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,t);gain.gain.exponentialRampToValueAtTime(0.35,t+0.01);gain.gain.exponentialRampToValueAtTime(0.0001,t+dur);osc.connect(gain).connect(audioCtx.destination);osc.start(t);osc.stop(t+dur+0.02);t+=dur+gap;}}catch(e){}}
+function beep(times=1,freq=800,dur=0.2,gap=0.1){
+  try{
+    audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();
+    let t=audioCtx.currentTime;
+    for(let i=0;i<times;i++){
+      const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+      osc.type="sine";osc.frequency.value=freq;
+      gain.gain.setValueAtTime(0.0001,t);
+      gain.gain.exponentialRampToValueAtTime(0.35,t+0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t);osc.stop(t+dur+0.02);
+      t+=dur+gap;
+    }
+  }catch(e){}
+}
 function pad2(n){return String(n).padStart(2,"0");}
 function formatElapsed(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60);return`${pad2(m)}:${pad2(s%60)}`;}
 function formatTimestampVN(d){return`${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
@@ -210,6 +232,7 @@ function sanitizeForFileName(str){return String(str||"unknown").replace(/[^a-zA-
 function fileTimestamp(d){return`${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}_${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;}
 function showEl(id,show){const el=document.getElementById(id);if(!el)return;el.classList.toggle("hidden",!show);}
 
+// --- UI EVENT LISTENERS ---
 document.getElementById("btnGoToCamera").addEventListener("click",()=>{
   document.getElementById("viewHome").classList.add("hidden");
   document.getElementById("viewCamera").classList.add("active");
@@ -219,9 +242,11 @@ document.getElementById("btnBackHome").addEventListener("click",()=>{
   document.getElementById("viewCamera").classList.remove("active");
   document.getElementById("viewHome").classList.remove("hidden");
   if(appState==="scanning")scanningActive=false;
+  if(scanInterval){clearInterval(scanInterval);scanInterval=null;}
   appState="home";
 });
 
+// --- SEARCH ---
 async function doSearch(){
   const code=document.getElementById("searchCode").value.trim();
   const resEl=document.getElementById("searchResult");
@@ -244,6 +269,7 @@ async function doSearch(){
 document.getElementById("btnSearch").addEventListener("click",doSearch);
 document.getElementById("searchCode").addEventListener("keypress",(e)=>{if(e.key==="Enter")doSearch();});
 
+// --- CAMERA INIT ---
 document.getElementById("btnEnableCamera").addEventListener("click",initCamera);
 document.getElementById("btnRetryCamera").addEventListener("click",initCamera);
 
@@ -251,7 +277,8 @@ async function initCamera(){
   document.getElementById("gateError").classList.add("hidden");
   document.getElementById("gateStart").classList.add("hidden");
   try{
-    mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}},audio:false});
+    // Performance optimization: Request 720p instead of 1080p
+    mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}},audio:false});
   }catch(err){
     document.getElementById("gateErrorMsg").innerText=err.name==="NotAllowedError"?"Bạn đã từ chối quyền camera. Vào cài đặt trình duyệt để cấp lại quyền, rồi bấm Thử lại.":"Không tìm thấy camera phù hợp. ("+err.message+")";
     document.getElementById("gateStart").classList.add("hidden");
@@ -262,7 +289,11 @@ async function initCamera(){
   await srcVideo.play().catch(()=>{});
   await new Promise(resolve=>{if(srcVideo.videoWidth>0)return resolve();srcVideo.onloadedmetadata=()=>resolve();});
   currentTrack=mediaStream.getVideoTracks()[0];
-  initZoom();resizeCanvas();startDrawLoop();initBarcodeReader();enterScanningState();
+  
+  initZoom();
+  resizeCanvas();
+  initBarcodeScanner();
+  enterScanningState();
 }
 
 function initZoom(){
@@ -283,85 +314,156 @@ function resizeCanvas(){outputCanvas.width=srcVideo.videoWidth||1280;outputCanva
 window.addEventListener("resize",()=>{if(mediaStream)resizeCanvas();});
 if(screen.orientation)screen.orientation.addEventListener("change",()=>{if(mediaStream)setTimeout(resizeCanvas,300);});
 
+// --- RENDER LOOP (FPS OPTIMIZED) ---
+let drawRafId=null;
+let lastDrawTime=0;
+let cachedTs="", lastTsSecond=-1;
+
 function startDrawLoop(){
-  function draw(){
-    if(srcVideo.readyState>=2)ctx.drawImage(srcVideo,0,0,outputCanvas.width,outputCanvas.height);
-    if(appState==="recording")drawOverlay();
-    requestAnimationFrame(draw);
+  if(drawRafId) cancelAnimationFrame(drawRafId);
+  function draw(now){
+    drawRafId=requestAnimationFrame(draw);
+    // Optimization: Only draw when recording
+    if(appState!=="recording") return; 
+    
+    // Throttle to ~30 FPS (33ms)
+    if(now-lastDrawTime<33) return;
+    lastDrawTime=now;
+
+    ctx.drawImage(srcVideo,0,0,outputCanvas.width,outputCanvas.height);
+    
+    // Draw Overlay
+    const w=outputCanvas.width,h=outputCanvas.height;
+    const fs=Math.max(20,Math.round(w*0.032));
+    ctx.font=`700 ${fs}px monospace`;ctx.textBaseline="bottom";
+    ctx.lineWidth=Math.max(3,fs*0.18);ctx.strokeStyle="rgba(0,0,0,.85)";ctx.fillStyle="#fff";ctx.lineJoin="round";
+    const mg=Math.round(w*0.025);
+    
+    ctx.textAlign="left";
+    ctx.strokeText(currentTrackingCode||"—",mg,h-mg);
+    ctx.fillText(currentTrackingCode||"—",mg,h-mg);
+    
+    // Cache timestamp string
+    const d=new Date();
+    const s=d.getSeconds();
+    if(s!==lastTsSecond){
+      lastTsSecond=s;
+      cachedTs=formatTimestampVN(d);
+    }
+    
+    ctx.textAlign="right";
+    ctx.strokeText(cachedTs,w-mg,h-mg);
+    ctx.fillText(cachedTs,w-mg,h-mg);
   }
-  draw();
-}
-function drawOverlay(){
-  const w=outputCanvas.width,h=outputCanvas.height;
-  const fs=Math.max(20,Math.round(w*0.032));
-  ctx.font=`700 ${fs}px monospace`;ctx.textBaseline="bottom";
-  ctx.lineWidth=Math.max(3,fs*0.18);ctx.strokeStyle="rgba(0,0,0,.85)";ctx.fillStyle="#fff";ctx.lineJoin="round";
-  const mg=Math.round(w*0.025);
-  ctx.textAlign="left";ctx.strokeText(currentTrackingCode||"—",mg,h-mg);ctx.fillText(currentTrackingCode||"—",mg,h-mg);
-  ctx.textAlign="right";const ts=formatTimestampVN(new Date());ctx.strokeText(ts,w-mg,h-mg);ctx.fillText(ts,w-mg,h-mg);
+  drawRafId=requestAnimationFrame(draw);
 }
 
+// --- OPTIMIZED BARCODE SCANNER ---
 const _scanCanvas=document.createElement("canvas"),_scanCtx=_scanCanvas.getContext("2d",{willReadFrequently:true});
-function initBarcodeReader(){
+function initBarcodeScanner(){
   const hints=new Map();
   hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.DATA_MATRIX,ZXing.BarcodeFormat.ITF]);
   hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
   codeReader=new ZXing.BrowserMultiFormatReader(hints);
-  codeReader.decodeFromVideoElementContinuously(srcVideo,(result)=>{if(result)handleDecodedCode(result.getText());});
+}
+
+function processScanFrame(){
+  if(appState!=="scanning"||!scanningActive||srcVideo.readyState<2||srcVideo.videoWidth===0) return;
+  
+  // Optimization: Crop center area (50% width/height) to reduce pixel processing
+  const w=srcVideo.videoWidth, h=srcVideo.videoHeight;
+  const cw=Math.floor(w*0.5), ch=Math.floor(h*0.5);
+  const cx=Math.floor((w-cw)/2), cy=Math.floor((h-ch)/2);
+  
+  _scanCanvas.width=cw; _scanCanvas.height=ch;
+  _scanCtx.drawImage(srcVideo,cx,cy,cw,ch,0,0,cw,ch);
+  
+  let foundCode=null;
+  
+  // Try jsQR first (very fast for QR)
   if(typeof jsQR==="function"){
-    (function jsqrLoop(){
-      if(srcVideo.readyState>=2&&srcVideo.videoWidth>0&&(appState==="scanning"||appState==="recording")){
-        _scanCanvas.width=srcVideo.videoWidth;_scanCanvas.height=srcVideo.videoHeight;_scanCtx.drawImage(srcVideo,0,0);
-        try{const imgData=_scanCtx.getImageData(0,0,_scanCanvas.width,_scanCanvas.height);const qr=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"dontInvert"});if(qr&&qr.data)handleDecodedCode(qr.data);}catch(e){}
-      }
-      setTimeout(jsqrLoop,300);
-    })();
+    try{
+      const imgData=_scanCtx.getImageData(0,0,cw,ch);
+      const qr=jsQR(imgData.data,cw,ch,{inversionAttempts:"dontInvert"});
+      if(qr&&qr.data) foundCode=qr.data;
+    }catch(e){}
+  }
+  
+  // Try ZXing (for barcodes) if jsQR didn't find anything
+  if(!foundCode && codeReader){
+    try{
+      codeReader.decodeFromCanvas(_scanCanvas).then(result=>{
+        if(result) handleDecodedCode(result.getText());
+      }).catch(e=>{}); // Ignore NotFound errors
+    }catch(e){}
+  }else if(foundCode){
+    handleDecodedCode(foundCode);
   }
 }
 
 function handleDecodedCode(text){
-  const now=Date.now();if(now-lastScanTime<1500)return;lastScanTime=now;
-  if(!document.getElementById("viewCamera").classList.contains("active"))return;
-  if(appState==="scanning"){if(!scanningActive)return;startRecording(text);}
-  else if(appState==="recording"){stopRecordingAndUpload();}
-  else if(appState==="done"){
-    currentTrackingCode="";recordedBlob=null;recordedChunks=[];
-    document.getElementById("actionOverlay").classList.remove("show");
-    enterScanningState();
-    setTimeout(()=>{if(appState==="scanning")startRecording(text);},150);
-  }
+  if(appState!=="scanning"||!scanningActive)return;
+  startRecording(text);
 }
 
 function enterScanningState(){
   appState="scanning";scanningActive=true;
+  outputCanvas.style.display="none"; // Hide canvas, use native video
+  srcVideo.style.display="block";
   document.getElementById("scanReticle").style.display="block";
   document.getElementById("recChip").classList.remove("show");
   document.getElementById("actionOverlay").classList.remove("show");
   document.getElementById("scanHint").classList.remove("hidden");
+  
+  if(!scanInterval){
+    scanInterval=setInterval(processScanFrame, 500); // Poll every 500ms
+  }
 }
 
 function startRecording(trackingCodeValue){
   const finalCode=(trackingCodeValue||"").trim();
   if(!finalCode){const m=prompt("Nhập mã vận đơn:");if(!m||!m.trim())return;startRecording(m.trim());return;}
-  currentTrackingCode=finalCode;appState="recording";
+  currentTrackingCode=finalCode;
+  appState="recording";
+  
+  if(scanInterval){clearInterval(scanInterval);scanInterval=null;} // Stop scanner completely
+  
+  // Setup display for recording
+  srcVideo.style.display="none"; // Hide native video
+  outputCanvas.style.display="block"; // Show canvas for recording
+  
   document.getElementById("scanReticle").style.display="none";
   document.getElementById("recChip").classList.add("show");
   document.getElementById("scanHint").classList.add("hidden");
   document.getElementById("actionOverlay").classList.add("show");
   document.getElementById("uploadGroup").style.display="none";
   showEl("statusLine2",false);showEl("btnStopRecord",true);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);
+  
   beep(1,800,0.2);requestWakeLock();
+  
+  startDrawLoop(); // Start canvas draw loop at 30fps
+  
   recordedChunks=[];
   const canvasStream=outputCanvas.captureStream(30);
   const mimes=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/mp4","video/webm"];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||"";
-  try{mediaRecorder=mime?new MediaRecorder(canvasStream,{mimeType:mime,videoBitsPerSecond:2000000}):new MediaRecorder(canvasStream);}
+  try{mediaRecorder=mime?new MediaRecorder(canvasStream,{mimeType:mime,videoBitsPerSecond:1500000}):new MediaRecorder(canvasStream);}
   catch(e){alert("Thiết bị không hỗ trợ quay video. Dùng Chrome trên Android.");enterScanningState();return;}
+  
   mediaRecorder.ondataavailable=(e)=>{if(e.data&&e.data.size>0)recordedChunks.push(e.data);};
   mediaRecorder.onstop=onRecorderStopped;
   mediaRecorder.start(1000);
+  
   recordStartTs=Date.now();
-  recTimerInterval=setInterval(()=>{document.getElementById("recTimer").innerText=formatElapsed(Date.now()-recordStartTs);},500);
+  if(recTimerInterval) clearInterval(recTimerInterval);
+  let blink=false;
+  const reddot=document.getElementById("reddot");
+  recTimerInterval=setInterval(()=>{
+    document.getElementById("recTimer").innerText=formatElapsed(Date.now()-recordStartTs);
+    // Simple blink via JS instead of CSS animation
+    blink=!blink;
+    if(blink) reddot.classList.add("blink"); else reddot.classList.remove("blink");
+  },1000);
 }
 
 document.getElementById("btnStopRecord").addEventListener("click",stopRecordingAndUpload);
@@ -370,12 +472,16 @@ document.getElementById("btnManualRecord").addEventListener("click",()=>{if(appS
 function stopRecordingAndUpload(){
   if(appState!=="recording"||!mediaRecorder)return;
   if(mediaRecorder.state!=="inactive")mediaRecorder.stop();
+  if(drawRafId){cancelAnimationFrame(drawRafId); drawRafId=null;} // Stop rendering
   clearInterval(recTimerInterval);beep(2,600,0.2,0.1);releaseWakeLock();
 }
 function onRecorderStopped(){
   recordedBlob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||"video/webm"});
   pendingUploadTrackingCode=currentTrackingCode;
   document.getElementById("recChip").classList.remove("show");
+  // Restore preview view
+  outputCanvas.style.display="none";
+  srcVideo.style.display="block";
   uploadVideoToDrive(recordedBlob,pendingUploadTrackingCode);
 }
 
@@ -385,9 +491,11 @@ async function uploadVideoToDrive(blob,trackingCodeValue){
   document.getElementById("scanReticle").style.display="none";
   document.getElementById("scanHint").classList.add("hidden");
   showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);
+  
   const ug=document.getElementById("uploadGroup");ug.style.display="flex";
   document.getElementById("statusLine").innerHTML=`⏫ Đang upload mã <strong>${trackingCodeValue}</strong>...`;
   showEl("statusLine2",false);updateProgress(0);
+  
   const ext=(blob.type||"video/webm").includes("mp4")?"mp4":"webm";
   const fileName=`${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
   let base64;
@@ -399,6 +507,7 @@ async function uploadVideoToDrive(blob,trackingCodeValue){
       reader.readAsDataURL(blob);
     });
   }catch(e){enterErrorState(e.message);return;}
+  
   const payload=JSON.stringify({action:"uploadVideo",key:CONFIG.SECRET_KEY,data:{base64,mimeType:blob.type||"video/webm",fileName,trackingCode:trackingCodeValue,uploadDate:new Date().toISOString()}});
   let fakePct=0;
   const fakeTimer=setInterval(()=>{fakePct=fakePct<70?fakePct+4:fakePct<90?fakePct+0.8:fakePct;updateProgress(Math.round(fakePct));},400);
@@ -424,7 +533,9 @@ function enterDoneState(uploadResult){
   document.getElementById("statusLine2").innerHTML=`✅ Đã lưu! Mã <strong>${pendingUploadTrackingCode}</strong><br><span style="font-size:12px;opacity:.7">Quét mã mới để quay tiếp</span>`;
   showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("btnNewRecording",true);
   if(uploadResult&&uploadResult.driveUrl){document.getElementById("videoResultLink").href=uploadResult.driveUrl;showEl("videoResultLink",true);}
-  recordedBlob=null;recordedChunks=[];scanningActive=true;
+  recordedBlob=null;recordedChunks=[];
+  
+  enterScanningState();
 }
 
 function enterErrorState(message){
