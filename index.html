@@ -44,6 +44,11 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .result-value{font-size:14px;font-weight:600;font-family:var(--mono);margin-bottom:10px;}
 .result-drive-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--indigo);color:#fff;text-decoration:none;border-radius:12px;padding:12px;font-size:14px;font-weight:700;margin-top:14px;}
 .result-notfound-msg{color:var(--red);font-size:14px;font-weight:600;text-align:center;}
+.status-badge{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#06210f;padding:8px 16px;border-radius:50px;font-size:13px;font-weight:700;margin-bottom:12px;}
+.status-badge.red{background:var(--red);color:#fff;}
+.status-badge.loading{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2);}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
 .camera-cta{margin:20px 20px 0;padding-bottom:max(20px,env(safe-area-inset-bottom));}
 .btn-camera-big{width:100%;background:var(--amber);color:#1a0e00;border:none;border-radius:20px;padding:22px;font-size:18px;font-weight:800;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;}
 
@@ -288,27 +293,27 @@ document.getElementById("btnToggleOrient").addEventListener("click", () => {
 async function doSearch(){
   const code=document.getElementById("searchCode").value.trim();
   const resEl=document.getElementById("searchResult");
-  if(!code){resEl.className="search-result-card notfound show";resEl.innerHTML='<div class="result-notfound-msg">Vui lòng nhập mã vận đơn</div>';return;}
+  if(!code){resEl.className="search-result-card notfound show";resEl.innerHTML='<div class="status-badge red">⚠️ Vui lòng nhập mã vận đơn</div>';return;}
   resEl.className="search-result-card loading show";
-  resEl.innerHTML='<div style="color:var(--text-dim);text-align:center;font-size:14px;">⏳ Đang tìm kiếm...</div>';
+  resEl.innerHTML='<div class="status-badge loading"><span class="spinner"></span> Đang truy xuất dữ liệu từ máy chủ...</div>';
   try{
     const res=await fetch(CONFIG.APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"searchVideo",key:CONFIG.SECRET_KEY,data:{trackingCode:code}})});
     const data=await res.json();
     if(data.ok){
       const dateStr=data.uploadDate?new Date(data.uploadDate).toLocaleString("vi-VN"):"N/A";
       resEl.className="search-result-card found show";
-      resEl.innerHTML=`<div class="result-label">Mã vận đơn</div><div class="result-value">${data.trackingCode}</div><div class="result-label">Thời gian quay</div><div class="result-value" style="font-size:13px">${dateStr}</div><div style="display:flex;gap:10px;margin-top:14px;"><a href="${data.driveUrl}" target="_blank" class="result-drive-btn" style="flex:1;margin-top:0;">🔗 Xem / Tải</a><button onclick="deleteFoundVideo('${data.trackingCode}')" style="background:var(--red);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;">🗑 Xóa</button></div>`;
+      resEl.innerHTML=`<div class="status-badge">✅ Đã tìm thấy dữ liệu</div><br><div class="result-label">Mã vận đơn</div><div class="result-value">${data.trackingCode}</div><div class="result-label">Thời gian quay</div><div class="result-value" style="font-size:13px">${dateStr}</div><div style="display:flex;gap:10px;margin-top:14px;"><a href="${data.driveUrl}" target="_blank" class="result-drive-btn" style="flex:1;margin-top:0;">🔗 Xem / Tải</a><button onclick="deleteFoundVideo('${data.trackingCode}')" style="background:var(--red);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;">🗑 Xóa</button></div>`;
     }else{
       resEl.className="search-result-card notfound show";
-      resEl.innerHTML='<div class="result-notfound-msg">❌ Không tìm thấy video cho mã này.</div>';
+      resEl.innerHTML=`<div class="status-badge red">❌ Không tìm thấy video cho mã này.</div>`;
     }
-  }catch(e){resEl.className="search-result-card notfound show";resEl.innerHTML='<div class="result-notfound-msg">⚠️ Lỗi kết nối. Thử lại sau.</div>';}
+  }catch(e){resEl.className="search-result-card notfound show";resEl.innerHTML=`<div class="status-badge red">⚠️ Lỗi kết nối đến máy chủ.</div>`;}
 }
 window.deleteFoundVideo = async function(code) {
   if(!confirm(`Bạn có chắc chắn muốn xóa video của mã vận đơn ${code} không?`)) return;
   const resEl = document.getElementById("searchResult");
   const oldHTML = resEl.innerHTML;
-  resEl.innerHTML = '<div style="color:var(--text-dim);text-align:center;font-size:14px;">⏳ Đang xóa...</div>';
+  resEl.innerHTML = '<div class="status-badge loading"><span class="spinner"></span> Đang gửi lệnh xóa...</div>';
   try {
     const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: "POST", headers: { "Content-Type": "text/plain" },
@@ -317,7 +322,7 @@ window.deleteFoundVideo = async function(code) {
     const data = await res.json();
     if (data.ok) {
       resEl.className = "search-result-card found show";
-      resEl.innerHTML = `<div class="result-notfound-msg" style="color:var(--green)">✅ Đã xóa video thành công!</div>`;
+      resEl.innerHTML = `<div class="status-badge">✅ Đã xóa video thành công!</div>`;
     } else {
       alert("Lỗi khi xóa: " + (data.error || "Không xác định"));
       resEl.innerHTML = oldHTML;
