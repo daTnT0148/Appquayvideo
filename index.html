@@ -297,13 +297,36 @@ async function doSearch(){
     if(data.ok){
       const dateStr=data.uploadDate?new Date(data.uploadDate).toLocaleString("vi-VN"):"N/A";
       resEl.className="search-result-card found show";
-      resEl.innerHTML=`<div class="result-label">Mã vận đơn</div><div class="result-value">${data.trackingCode}</div><div class="result-label">Thời gian quay</div><div class="result-value" style="font-size:13px">${dateStr}</div><a href="${data.driveUrl}" target="_blank" class="result-drive-btn">🔗 Mở xem / Tải về (Google Drive)</a>`;
+      resEl.innerHTML=`<div class="result-label">Mã vận đơn</div><div class="result-value">${data.trackingCode}</div><div class="result-label">Thời gian quay</div><div class="result-value" style="font-size:13px">${dateStr}</div><div style="display:flex;gap:10px;margin-top:14px;"><a href="${data.driveUrl}" target="_blank" class="result-drive-btn" style="flex:1;margin-top:0;">🔗 Xem / Tải</a><button onclick="deleteFoundVideo('${data.trackingCode}')" style="background:var(--red);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;">🗑 Xóa</button></div>`;
     }else{
       resEl.className="search-result-card notfound show";
       resEl.innerHTML='<div class="result-notfound-msg">❌ Không tìm thấy video cho mã này.</div>';
     }
   }catch(e){resEl.className="search-result-card notfound show";resEl.innerHTML='<div class="result-notfound-msg">⚠️ Lỗi kết nối. Thử lại sau.</div>';}
 }
+window.deleteFoundVideo = async function(code) {
+  if(!confirm(`Bạn có chắc chắn muốn xóa video của mã vận đơn ${code} không?`)) return;
+  const resEl = document.getElementById("searchResult");
+  const oldHTML = resEl.innerHTML;
+  resEl.innerHTML = '<div style="color:var(--text-dim);text-align:center;font-size:14px;">⏳ Đang xóa...</div>';
+  try {
+    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "deleteVideo", key: CONFIG.SECRET_KEY, data: { trackingCode: code } })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      resEl.className = "search-result-card found show";
+      resEl.innerHTML = `<div class="result-notfound-msg" style="color:var(--green)">✅ Đã xóa video thành công!</div>`;
+    } else {
+      alert("Lỗi khi xóa: " + (data.error || "Không xác định"));
+      resEl.innerHTML = oldHTML;
+    }
+  } catch(e) {
+    alert("Lỗi kết nối khi xóa.");
+    resEl.innerHTML = oldHTML;
+  }
+};
 document.getElementById("btnSearch").addEventListener("click",doSearch);
 document.getElementById("searchCode").addEventListener("keypress",(e)=>{if(e.key==="Enter")doSearch();});
 
