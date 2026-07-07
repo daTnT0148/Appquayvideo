@@ -71,6 +71,9 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .zoom-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .zoom-label{background:rgba(0,0,0,.6);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:20px;padding:4px 8px;text-align:center;min-width:44px;}
 
+/* Orient controls */
+.orient-controls{display:none;flex-direction:column;gap:8px;position:absolute;left:14px;top:50%;transform:translateY(-50%);z-index:20;}
+
 .scan-reticle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72%;max-width:320px;aspect-ratio:1;pointer-events:none;z-index:10;}
 .scan-reticle .corner{position:absolute;width:28px;height:28px;border:3px solid var(--amber);opacity:.9;}
 .scan-reticle .tl{top:0;left:0;border-right:none;border-bottom:none;border-radius:8px 0 0 0;}
@@ -155,6 +158,11 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
     <div class="scan-line" id="scanLine"></div>
   </div>
   
+  <div class="orient-controls" id="orientControls">
+    <button class="zoom-btn" id="btnToggleOrient">📱</button>
+    <div class="zoom-label" id="orientLabel">Dọc</div>
+  </div>
+  
   <div class="zoom-controls" id="zoomControls">
     <button class="zoom-btn" id="btnZoomIn">＋</button>
     <div class="zoom-label" id="zoomLabel">1×</div>
@@ -196,8 +204,9 @@ window.addEventListener("appinstalled",()=>document.getElementById("btnInstall")
 
 // --- STATE & VARS ---
 let appState="home",mediaStream=null,currentTrack=null,zoomLevel=1,zoomMin=1,zoomMax=5,zoomStep=0.5;
+let forceLandscape=false; // Quản lý góc quay
 const srcVideo=document.getElementById("srcVideo"), outputCanvas=document.getElementById("outputCanvas");
-const ctx=outputCanvas.getContext("2d",{alpha:false}); // Optimization
+const ctx=outputCanvas.getContext("2d",{alpha:false}); 
 
 let codeReader=null, scanningActive=false, scanInterval=null;
 let mediaRecorder=null, recordedChunks=[], recordedBlob=null;
@@ -246,6 +255,35 @@ document.getElementById("btnBackHome").addEventListener("click",()=>{
   appState="home";
 });
 
+// --- ORIENTATION TOGGLE ---
+function updateOrientUI() {
+  const btn = document.getElementById("btnToggleOrient");
+  const lbl = document.getElementById("orientLabel");
+  if(forceLandscape) {
+    btn.innerHTML = "📺"; // Landscape Icon
+    lbl.textContent = "Ngang";
+  } else {
+    btn.innerHTML = "📱"; // Portrait Icon
+    lbl.textContent = "Dọc";
+  }
+}
+function autoDetectOrientation() {
+  if(appState === "recording") return; // Keep locked while recording
+  if (window.innerWidth > window.innerHeight) {
+    forceLandscape = true;
+  } else {
+    forceLandscape = false;
+  }
+  updateOrientUI();
+  if (mediaStream) resizeCanvas();
+}
+document.getElementById("btnToggleOrient").addEventListener("click", () => {
+  if(appState === "recording") return; // Cannot change while recording
+  forceLandscape = !forceLandscape;
+  updateOrientUI();
+  if (mediaStream) resizeCanvas();
+});
+
 // --- SEARCH ---
 async function doSearch(){
   const code=document.getElementById("searchCode").value.trim();
@@ -277,7 +315,6 @@ async function initCamera(){
   document.getElementById("gateError").classList.add("hidden");
   document.getElementById("gateStart").classList.add("hidden");
   try{
-    // Performance optimization: Request 720p instead of 1080p
     mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}},audio:false});
   }catch(err){
     document.getElementById("gateErrorMsg").innerText=err.name==="NotAllowedError"?"Bạn đã từ chối quyền camera. Vào cài đặt trình duyệt để cấp lại quyền, rồi bấm Thử lại.":"Không tìm thấy camera phù hợp. ("+err.message+")";
@@ -291,6 +328,8 @@ async function initCamera(){
   currentTrack=mediaStream.getVideoTracks()[0];
   
   initZoom();
+  autoDetectOrientation();
+  document.getElementById("orientControls").style.display="flex";
   resizeCanvas();
   initBarcodeScanner();
   enterScanningState();
@@ -310,11 +349,25 @@ function updateZoomUI(){document.getElementById("zoomLabel").textContent=zoomLev
 document.getElementById("btnZoomIn").addEventListener("click",()=>{applyZoom(Math.min(zoomMax,parseFloat((zoomLevel+zoomStep).toFixed(1))));});
 document.getElementById("btnZoomOut").addEventListener("click",()=>{applyZoom(Math.max(zoomMin,parseFloat((zoomLevel-zoomStep).toFixed(1))));});
 
-function resizeCanvas(){outputCanvas.width=srcVideo.videoWidth||1280;outputCanvas.height=srcVideo.videoHeight||720;}
-window.addEventListener("resize",()=>{if(mediaStream)resizeCanvas();});
-if(screen.orientation)screen.orientation.addEventListener("change",()=>{if(mediaStream)setTimeout(resizeCanvas,300);});
+function resizeCanvas(){
+  let vw=srcVideo.videoWidth||1280;
+  let vh=srcVideo.videoHeight||720;
+  
+  if (forceLandscape && vw < vh) {
+    outputCanvas.width = vh;
+    outputCanvas.height = vw;
+  } else if (!forceLandscape && vw > vh) {
+    outputCanvas.width = vh;
+    outputCanvas.height = vw;
+  } else {
+    outputCanvas.width = vw;
+    outputCanvas.height = vh;
+  }
+}
+window.addEventListener("resize",()=>{if(mediaStream){autoDetectOrientation(); resizeCanvas();}});
+if(screen.orientation)screen.orientation.addEventListener("change",()=>{if(mediaStream)setTimeout(()=>{autoDetectOrientation(); resizeCanvas();},300);});
 
-// --- RENDER LOOP (FPS OPTIMIZED) ---
+// --- RENDER LOOP (FPS OPTIMIZED & ROTATION HANDLED) ---
 let drawRafId=null;
 let lastDrawTime=0;
 let cachedTs="", lastTsSecond=-1;
@@ -323,27 +376,42 @@ function startDrawLoop(){
   if(drawRafId) cancelAnimationFrame(drawRafId);
   function draw(now){
     drawRafId=requestAnimationFrame(draw);
-    // Optimization: Only draw when recording
     if(appState!=="recording") return; 
     
-    // Throttle to ~30 FPS (33ms)
-    if(now-lastDrawTime<33) return;
+    if(now-lastDrawTime<33) return; // 30fps
     lastDrawTime=now;
 
-    ctx.drawImage(srcVideo,0,0,outputCanvas.width,outputCanvas.height);
+    const vw=srcVideo.videoWidth, vh=srcVideo.videoHeight;
+    const cw=outputCanvas.width, ch=outputCanvas.height;
+    
+    ctx.save();
+    ctx.fillStyle="#000"; ctx.fillRect(0,0,cw,ch);
+    
+    if (forceLandscape && vw < vh) {
+      // Camera is portrait but user wants landscape => Rotate -90
+      ctx.translate(cw/2, ch/2);
+      ctx.rotate(-Math.PI/2);
+      ctx.drawImage(srcVideo, -vw/2, -vh/2, vw, vh);
+    } else if (!forceLandscape && vw > vh) {
+      // Camera is landscape but user wants portrait => Rotate 90
+      ctx.translate(cw/2, ch/2);
+      ctx.rotate(Math.PI/2);
+      ctx.drawImage(srcVideo, -vw/2, -vh/2, vw, vh);
+    } else {
+      ctx.drawImage(srcVideo, 0, 0, cw, ch);
+    }
+    ctx.restore();
     
     // Draw Overlay
-    const w=outputCanvas.width,h=outputCanvas.height;
-    const fs=Math.max(20,Math.round(w*0.032));
+    const fs=Math.max(20,Math.round(cw*0.032));
     ctx.font=`700 ${fs}px monospace`;ctx.textBaseline="bottom";
     ctx.lineWidth=Math.max(3,fs*0.18);ctx.strokeStyle="rgba(0,0,0,.85)";ctx.fillStyle="#fff";ctx.lineJoin="round";
-    const mg=Math.round(w*0.025);
+    const mg=Math.round(cw*0.025);
     
     ctx.textAlign="left";
-    ctx.strokeText(currentTrackingCode||"—",mg,h-mg);
-    ctx.fillText(currentTrackingCode||"—",mg,h-mg);
+    ctx.strokeText(currentTrackingCode||"—",mg,ch-mg);
+    ctx.fillText(currentTrackingCode||"—",mg,ch-mg);
     
-    // Cache timestamp string
     const d=new Date();
     const s=d.getSeconds();
     if(s!==lastTsSecond){
@@ -352,8 +420,8 @@ function startDrawLoop(){
     }
     
     ctx.textAlign="right";
-    ctx.strokeText(cachedTs,w-mg,h-mg);
-    ctx.fillText(cachedTs,w-mg,h-mg);
+    ctx.strokeText(cachedTs,cw-mg,ch-mg);
+    ctx.fillText(cachedTs,cw-mg,ch-mg);
   }
   drawRafId=requestAnimationFrame(draw);
 }
@@ -370,7 +438,6 @@ function initBarcodeScanner(){
 function processScanFrame(){
   if(appState!=="scanning"||!scanningActive||srcVideo.readyState<2||srcVideo.videoWidth===0) return;
   
-  // Optimization: Crop center area (50% width/height) to reduce pixel processing
   const w=srcVideo.videoWidth, h=srcVideo.videoHeight;
   const cw=Math.floor(w*0.5), ch=Math.floor(h*0.5);
   const cx=Math.floor((w-cw)/2), cy=Math.floor((h-ch)/2);
@@ -380,7 +447,6 @@ function processScanFrame(){
   
   let foundCode=null;
   
-  // Try jsQR first (very fast for QR)
   if(typeof jsQR==="function"){
     try{
       const imgData=_scanCtx.getImageData(0,0,cw,ch);
@@ -389,12 +455,11 @@ function processScanFrame(){
     }catch(e){}
   }
   
-  // Try ZXing (for barcodes) if jsQR didn't find anything
   if(!foundCode && codeReader){
     try{
       codeReader.decodeFromCanvas(_scanCanvas).then(result=>{
         if(result) handleDecodedCode(result.getText());
-      }).catch(e=>{}); // Ignore NotFound errors
+      }).catch(e=>{});
     }catch(e){}
   }else if(foundCode){
     handleDecodedCode(foundCode);
@@ -408,15 +473,16 @@ function handleDecodedCode(text){
 
 function enterScanningState(){
   appState="scanning";scanningActive=true;
-  outputCanvas.style.display="none"; // Hide canvas, use native video
+  outputCanvas.style.display="none"; 
   srcVideo.style.display="block";
   document.getElementById("scanReticle").style.display="block";
   document.getElementById("recChip").classList.remove("show");
   document.getElementById("actionOverlay").classList.remove("show");
   document.getElementById("scanHint").classList.remove("hidden");
+  document.getElementById("orientControls").style.display="flex"; // Cho phép đổi góc quay
   
   if(!scanInterval){
-    scanInterval=setInterval(processScanFrame, 500); // Poll every 500ms
+    scanInterval=setInterval(processScanFrame, 500);
   }
 }
 
@@ -426,22 +492,23 @@ function startRecording(trackingCodeValue){
   currentTrackingCode=finalCode;
   appState="recording";
   
-  if(scanInterval){clearInterval(scanInterval);scanInterval=null;} // Stop scanner completely
+  if(scanInterval){clearInterval(scanInterval);scanInterval=null;}
   
   // Setup display for recording
-  srcVideo.style.display="none"; // Hide native video
-  outputCanvas.style.display="block"; // Show canvas for recording
+  srcVideo.style.display="none"; 
+  outputCanvas.style.display="block"; 
   
   document.getElementById("scanReticle").style.display="none";
   document.getElementById("recChip").classList.add("show");
   document.getElementById("scanHint").classList.add("hidden");
   document.getElementById("actionOverlay").classList.add("show");
   document.getElementById("uploadGroup").style.display="none";
+  document.getElementById("orientControls").style.display="none"; // Khóa nút đổi góc khi đang quay
   showEl("statusLine2",false);showEl("btnStopRecord",true);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);
   
   beep(1,800,0.2);requestWakeLock();
   
-  startDrawLoop(); // Start canvas draw loop at 30fps
+  startDrawLoop(); 
   
   recordedChunks=[];
   const canvasStream=outputCanvas.captureStream(30);
@@ -460,7 +527,6 @@ function startRecording(trackingCodeValue){
   const reddot=document.getElementById("reddot");
   recTimerInterval=setInterval(()=>{
     document.getElementById("recTimer").innerText=formatElapsed(Date.now()-recordStartTs);
-    // Simple blink via JS instead of CSS animation
     blink=!blink;
     if(blink) reddot.classList.add("blink"); else reddot.classList.remove("blink");
   },1000);
@@ -472,14 +538,13 @@ document.getElementById("btnManualRecord").addEventListener("click",()=>{if(appS
 function stopRecordingAndUpload(){
   if(appState!=="recording"||!mediaRecorder)return;
   if(mediaRecorder.state!=="inactive")mediaRecorder.stop();
-  if(drawRafId){cancelAnimationFrame(drawRafId); drawRafId=null;} // Stop rendering
+  if(drawRafId){cancelAnimationFrame(drawRafId); drawRafId=null;} 
   clearInterval(recTimerInterval);beep(2,600,0.2,0.1);releaseWakeLock();
 }
 function onRecorderStopped(){
   recordedBlob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||"video/webm"});
   pendingUploadTrackingCode=currentTrackingCode;
   document.getElementById("recChip").classList.remove("show");
-  // Restore preview view
   outputCanvas.style.display="none";
   srcVideo.style.display="block";
   uploadVideoToDrive(recordedBlob,pendingUploadTrackingCode);

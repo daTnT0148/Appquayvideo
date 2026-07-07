@@ -8,7 +8,7 @@
  *   → luôn dùng kết nối thật khi upload, không bao giờ trả cache cho request đó
  */
 
-const CACHE_NAME = "video-proof-cache-v3";
+const CACHE_NAME = "video-proof-cache-v4";
 
 const APP_SHELL = [
   "/",
