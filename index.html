@@ -4,1011 +4,448 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Video Bằng Chứng Đóng Gói</title>
-
-<!-- ===== PWA meta ===== -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6366f1">
+<meta name="theme-color" content="#0a0a0a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VBC">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
-
-<!-- Thư viện quét mã vạch/QR realtime -->
 <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
-<!-- jsQR: chuyên quét QR code, đáng tin hơn ZXing cho QR -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0f0f0f;
-    --card:#181818;
-    --border:#2a2a2a;
-    --text:#ffffff;
-    --text-dim:#9a9a9a;
-    --amber:#f5b942;
-    --red:#ef4444;
-    --indigo:#6366f1;
-    --green:#22c55e;
-    --mono: 'SFMono-Regular', Consolas, 'Courier New', monospace;
-    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  }
+:root{--bg:#0a0a0a;--card:#161616;--card2:#1e1e1e;--border:#2a2a2a;--text:#fff;--text-dim:#888;--amber:#f5b942;--red:#ef4444;--indigo:#6366f1;--green:#22c55e;--mono:'SFMono-Regular',Consolas,'Courier New',monospace;--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100%;overscroll-behavior:none;overflow:hidden;}
+body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* HOME */
+#viewHome{display:flex;flex-direction:column;height:100%;overflow-y:auto;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);}
+#viewHome.hidden{display:none;}
+.home-topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0;}
+.home-logo{font-size:20px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--amber),#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.install-badge{display:none;background:var(--indigo);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+.install-badge.show{display:block;}
+.home-hero{padding:28px 20px 0;}
+.home-hero h2{font-size:26px;font-weight:800;line-height:1.2;letter-spacing:-0.5px;margin-bottom:8px;}
+.home-hero p{font-size:14px;color:var(--text-dim);line-height:1.6;}
+.search-card{margin:20px 20px 0;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;}
+.search-card-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-dim);margin-bottom:10px;}
+.search-row{display:flex;gap:10px;}
+.search-row input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:14px;color:var(--text);font-family:var(--mono);font-size:15px;padding:13px 14px;outline:none;transition:border-color .2s;}
+.search-row input:focus{border-color:var(--amber);}
+.search-row button{background:var(--indigo);color:#fff;border:none;border-radius:14px;padding:0 20px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;}
+.search-row button:active{opacity:.8;}
+.search-result-card{margin:12px 20px 0;border-radius:16px;padding:16px;display:none;animation:fadeIn .25s ease;}
+.search-result-card.show{display:block;}
+.search-result-card.found{background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);}
+.search-result-card.notfound{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);}
+.search-result-card.loading{background:var(--card);border:1px solid var(--border);}
+.result-label{font-size:11px;color:var(--text-dim);margin-bottom:3px;}
+.result-value{font-size:14px;font-weight:600;font-family:var(--mono);margin-bottom:10px;}
+.result-drive-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--indigo);color:#fff;text-decoration:none;border-radius:12px;padding:12px;font-size:14px;font-weight:700;margin-top:14px;}
+.result-notfound-msg{color:var(--red);font-size:14px;font-weight:600;text-align:center;}
+.camera-cta{margin:20px 20px 0;padding-bottom:max(20px,env(safe-area-inset-bottom));}
+.btn-camera-big{width:100%;background:linear-gradient(135deg,var(--amber),#ff9500);color:#1a0e00;border:none;border-radius:20px;padding:22px;font-size:18px;font-weight:800;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 8px 30px rgba(245,185,66,.25);transition:transform .15s,box-shadow .15s;}
+.btn-camera-big:active{transform:scale(.97);}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-  html, body {
-    margin: 0; padding: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    height: 100%;
-    overscroll-behavior: none;
-  }
+/* CAMERA VIEW */
+#viewCamera{display:none;position:fixed;inset:0;background:#000;z-index:100;}
+#viewCamera.active{display:block;}
+#srcVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;display:none;}
+#outputCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;}
 
-  body {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  }
+.gate{position:absolute;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:40px 32px;text-align:center;}
+.gate.hidden{display:none;}
+.gate-icon{font-size:64px;}
+.gate h2{font-size:22px;font-weight:800;}
+.gate p{font-size:14px;color:var(--text-dim);line-height:1.7;max-width:300px;}
+.btn-gate{background:linear-gradient(135deg,var(--amber),#ff9500);color:#1a0e00;border:none;border-radius:16px;padding:16px 36px;font-size:16px;font-weight:800;cursor:pointer;margin-top:8px;}
 
-  /* ===== Top bar ===== */
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px 10px;
-    flex-shrink: 0;
-  }
-  .topbar h1 {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0;
-  }
-  .topbar h1 span { color: var(--text-dim); font-weight: 400; }
+.cam-hud-top{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px 12px;background:linear-gradient(to bottom,rgba(0,0,0,.65) 0%,transparent 100%);}
+.btn-back{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:none;border-radius:50px;color:#fff;font-size:14px;font-weight:600;padding:8px 14px;cursor:pointer;}
+.rec-chip{display:none;align-items:center;gap:7px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:7px 14px;border-radius:100px;font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;}
+.rec-chip.show{display:flex;}
+.reddot{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulseRec 1s infinite;}
+@keyframes pulseRec{0%,100%{opacity:1}50%{opacity:.4}}
 
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 10px;
-    border-radius: 100px;
-    font-size: 11px;
-    font-weight: 600;
-    font-family: var(--mono);
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    background: rgba(245,185,66,0.12);
-    color: var(--amber);
-    border: 1px solid rgba(245,185,66,0.25);
-  }
-  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-  .status-pill.rec {
-    background: rgba(239,68,68,0.12); color: var(--red); border-color: rgba(239,68,68,0.3);
-    animation: pulseRec 1.2s infinite;
-  }
-  .status-pill.upload { background: rgba(99,102,241,0.15); color: #a5a8ff; border-color: rgba(99,102,241,0.35); }
-  .status-pill.done { background: rgba(34,197,94,0.12); color: var(--green); border-color: rgba(34,197,94,0.3); }
-  .status-pill.err { background: rgba(239,68,68,0.12); color: var(--red); border-color: rgba(239,68,68,0.3); }
+.zoom-controls{display:none;flex-direction:column;gap:8px;position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:20;}
+.zoom-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;}
+.zoom-btn:active{background:rgba(255,255,255,.28);}
+.zoom-label{background:rgba(0,0,0,.5);backdrop-filter:blur(8px);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;border-radius:20px;padding:4px 8px;text-align:center;min-width:44px;}
 
-  @keyframes pulseRec { 0%,100%{opacity:1;} 50%{opacity:0.55;} }
+.scan-reticle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72%;max-width:320px;aspect-ratio:1;pointer-events:none;z-index:10;}
+.scan-reticle .corner{position:absolute;width:28px;height:28px;border:3px solid var(--amber);opacity:.9;}
+.scan-reticle .tl{top:0;left:0;border-right:none;border-bottom:none;border-radius:8px 0 0 0;}
+.scan-reticle .tr{top:0;right:0;border-left:none;border-bottom:none;border-radius:0 8px 0 0;}
+.scan-reticle .bl{bottom:0;left:0;border-right:none;border-top:none;border-radius:0 0 0 8px;}
+.scan-reticle .br{bottom:0;right:0;border-left:none;border-top:none;border-radius:0 0 8px 0;}
+.scan-line{position:absolute;left:4%;right:4%;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent);animation:scanMove 2.2s ease-in-out infinite;box-shadow:0 0 10px var(--amber);}
+@keyframes scanMove{0%,100%{top:8%}50%{top:90%}}
 
-  /* ===== Install banner ===== */
-  .install-banner {
-    display: none;
-    margin: 0 16px 10px;
-    background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.06));
-    border: 1px solid rgba(99,102,241,0.3);
-    border-radius: 14px;
-    padding: 12px 14px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  .install-banner.show { display: flex; }
-  .install-banner span { font-size: 13px; color: var(--text); line-height: 1.4; }
-  .install-banner button {
-    background: var(--indigo); color: #fff; border: none;
-    padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
-    white-space: nowrap; cursor: pointer;
-  }
+.scan-hint{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:20;white-space:nowrap;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:50px;padding:10px 20px;font-size:13px;color:rgba(255,255,255,.85);font-weight:500;display:flex;align-items:center;gap:10px;}
+.scan-hint.hidden{display:none;}
+.btn-manual{background:var(--amber);color:#1a0e00;border:none;border-radius:30px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;}
 
-  /* ===== Tracking code input ===== */
-  .tracking-section { padding: 0 16px 12px; flex-shrink: 0; }
-  .tracking-row { display: flex; gap: 8px; }
-  .tracking-input-wrap { flex: 1; position: relative; }
-  .tracking-input-wrap label {
-    position: absolute; top: -8px; left: 12px;
-    background: var(--bg); padding: 0 6px;
-    font-size: 10px; color: var(--text-dim); letter-spacing: 0.4px; text-transform: uppercase;
-  }
-  #trackingCode {
-    width: 100%;
-    background: var(--card);
-    border: 1.5px solid var(--border);
-    border-radius: 14px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    padding: 14px;
-    outline: none;
-  }
-  #trackingCode:focus { border-color: var(--amber); }
-  #trackingCode::placeholder { color: var(--text-dim); font-weight: 500; letter-spacing: normal; font-size: 15px; }
-  #trackingCode:disabled { opacity: 0.6; }
-
-  .scan-toggle-btn {
-    width: 54px; flex-shrink: 0;
-    background: var(--card); border: 1.5px solid var(--border); border-radius: 14px;
-    color: var(--amber); font-size: 22px;
-    display: flex; align-items: center; justify-content: center; cursor: pointer;
-  }
-  .scan-toggle-btn.active { border-color: var(--amber); background: rgba(245,185,66,0.1); }
-
-  /* ===== Camera stage ===== */
-  .stage-wrap { flex: 1; padding: 0 16px; display: flex; min-height: 0; }
-  .stage {
-    position: relative; flex: 1;
-    border-radius: 20px; overflow: hidden; background: #000;
-    border: 1.5px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .stage.state-scan { border-color: rgba(245,185,66,0.5); box-shadow: 0 0 0 1px rgba(245,185,66,0.15) inset; }
-  .stage.state-rec  { border-color: rgba(239,68,68,0.6); box-shadow: 0 0 0 1px rgba(239,68,68,0.2) inset; }
-
-  #outputCanvas { width: 100%; height: 100%; object-fit: cover; display: block; }
-  #srcVideo { display: none; }
-
-  .scan-reticle {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 78%; max-width: 340px; aspect-ratio: 16/9; pointer-events: none;
-  }
-  .scan-reticle .corner { position: absolute; width: 26px; height: 26px; border: 3px solid var(--amber); opacity: 0.85; }
-  .scan-reticle .tl { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
-  .scan-reticle .tr { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
-  .scan-reticle .bl { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
-  .scan-reticle .br { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
-  .scan-line {
-    position: absolute; left: 4%; right: 4%; height: 2px;
-    background: linear-gradient(90deg, transparent, var(--amber), transparent);
-    animation: scanMove 2.2s ease-in-out infinite; box-shadow: 0 0 8px var(--amber);
-  }
-  @keyframes scanMove { 0%,100%{top:10%;} 50%{top:88%;} }
-
-  .rec-chip {
-    position: absolute; top: 12px; left: 12px; display: none;
-    align-items: center; gap: 7px;
-    background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
-    padding: 7px 12px; border-radius: 100px;
-    font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
-  }
-  .rec-chip.show { display: flex; }
-  .rec-chip .reddot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); animation: pulseRec 1s infinite; }
-
-  /* ===== Bottom control panel ===== */
-  .panel { flex-shrink: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-  .status-line { text-align: center; font-size: 14px; color: var(--text-dim); min-height: 20px; line-height: 1.5; }
-  .status-line strong { color: var(--text); }
-
-  .btn {
-    border: none; border-radius: 16px; padding: 17px;
-    font-size: 16px; font-weight: 700; font-family: var(--sans);
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    cursor: pointer; transition: transform 0.1s ease, opacity 0.2s; width: 100%;
-  }
-  .btn:active { transform: scale(0.97); }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-amber { background: var(--amber); color: #241a05; }
-  .btn-red   { background: var(--red); color: #fff; }
-  .btn-green { background: var(--green); color: #06210f; }
-  .btn-indigo { background: var(--indigo); color: #fff; }
-  .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text-dim); }
-
-  .btn-row { display: flex; gap: 10px; }
-  .btn-row .btn { flex: 1; }
-
-  /* Progress bar upload */
-  .progress-wrap {
-    width: 100%; height: 8px; background: var(--card);
-    border-radius: 100px; overflow: hidden; border: 1px solid var(--border);
-  }
-  .progress-bar {
-    height: 100%; width: 0%;
-    background: linear-gradient(90deg, var(--indigo), #8385ff);
-    transition: width 0.15s ease;
-  }
-  .progress-text {
-    text-align: center; font-family: var(--mono); font-size: 13px; color: var(--text-dim); font-weight: 700;
-  }
-
-  .video-link {
-    display: block; text-align: center; font-size: 13px; color: #a5a8ff;
-    text-decoration: underline; padding: 6px 0;
-  }
-
-  /* Overlay lỗi camera / màn chờ bật camera toàn màn hình */
-  .gate {
-    position: fixed; inset: 0; background: var(--bg); z-index: 50;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 32px; text-align: center; gap: 18px;
-  }
-  .gate.hidden { display: none; }
-  .gate .icon-big { font-size: 56px; }
-  .gate h2 { margin: 0; font-size: 19px; }
-  .gate p { margin: 0; color: var(--text-dim); font-size: 14px; line-height: 1.6; max-width: 320px; }
-  .gate .btn { max-width: 280px; }
-
-  .footnote { text-align: center; font-size: 11px; color: var(--text-dim); padding: 0 16px 10px; opacity: 0.7; }
-
-  /* ===== Views ===== */
-  .view-container { display: none; flex-direction: column; flex: 1; height: 100%; }
-  .view-container.active { display: flex; }
-
-  /* ===== Home View ===== */
-  .home-header { text-align: center; margin-bottom: 24px; padding-top: 20px; }
-  .home-header h1 { font-size: 22px; font-weight: 700; color: var(--amber); margin: 0 0 8px; }
-  .home-header p { font-size: 14px; color: var(--text-dim); margin: 0; line-height: 1.5; }
-  
-  .search-box { background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 24px; }
-  .search-box h3 { margin: 0 0 12px; font-size: 15px; color: var(--text); }
-  .search-input-wrap { display: flex; gap: 8px; }
-  .search-input-wrap input {
-    flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px;
-    color: var(--text); padding: 12px; font-family: var(--mono); font-size: 16px; outline: none;
-  }
-  .search-input-wrap input:focus { border-color: var(--amber); }
-  .search-input-wrap button {
-    background: var(--indigo); color: #fff; border: none; border-radius: 12px; padding: 0 16px;
-    font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  }
-  .search-input-wrap button:active { transform: scale(0.95); }
-
-  .search-result { display: none; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px; }
-  .search-result.show { display: block; }
-  .search-result.error { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--red); text-align: center; font-size: 14px; font-weight: 500; }
-  .result-item { font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
-  .result-item strong { color: var(--text); font-family: var(--mono); }
-  .result-actions { margin-top: 14px; }
-  
-  .home-actions { margin-top: auto; padding-bottom: 16px; }
-  
-  .btn-back-home { background: transparent; border: none; color: var(--text-dim); font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 0; }
+.action-overlay{display:none;position:absolute;inset:0;z-index:25;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(32px,env(safe-area-inset-bottom));animation:fadeIn .3s ease;}
+.action-overlay.show{display:flex;}
+.action-sheet{width:100%;max-width:420px;padding:0 20px;display:flex;flex-direction:column;gap:10px;}
+.action-title{text-align:center;font-size:14px;color:rgba(255,255,255,.75);line-height:1.5;}
+.action-title strong{color:#fff;}
+.progress-wrap{width:100%;height:6px;background:rgba(255,255,255,.15);border-radius:100px;overflow:hidden;}
+.progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--indigo),#a5a8ff);transition:width .2s ease;border-radius:100px;}
+.progress-text{text-align:center;font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.6);font-weight:700;}
+.btn-action{border:none;border-radius:18px;padding:18px;font-size:16px;font-weight:700;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:transform .1s,opacity .15s;width:100%;}
+.btn-action:active{transform:scale(.97);}
+.btn-action.green{background:var(--green);color:#06210f;}
+.btn-action.red{background:var(--red);color:#fff;}
+.btn-action.indigo{background:var(--indigo);color:#fff;}
+.btn-action.outline{background:transparent;border:1.5px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);}
+.btn-row{display:flex;gap:10px;}
+.btn-row .btn-action{flex:1;}
+.video-link-action{display:flex;align-items:center;justify-content:center;gap:8px;color:#a5a8ff;text-decoration:none;font-size:13px;font-weight:600;padding:6px;}
+.hidden{display:none!important;}
 </style>
 </head>
 <body>
 
-  <!-- ============ MÀN CHỜ BẬT CAMERA ============ -->
+<div id="viewHome">
+  <div class="home-topbar">
+    <div class="home-logo">📦 VBC</div>
+    <button class="install-badge" id="btnInstall">📲 Cài đặt</button>
+  </div>
+  <div class="home-hero">
+    <h2>Video Bằng Chứng<br>Đóng Gói</h2>
+    <p>Tra cứu video đã lưu theo mã vận đơn, hoặc bắt đầu quay mới.</p>
+  </div>
+  <div class="search-card">
+    <div class="search-card-label">🔍 Tra cứu video</div>
+    <div class="search-row">
+      <input type="text" id="searchCode" placeholder="Nhập mã vận đơn..." autocomplete="off" autocorrect="off" spellcheck="false">
+      <button id="btnSearch">Tìm</button>
+    </div>
+  </div>
+  <div class="search-result-card" id="searchResult"></div>
+  <div style="flex:1;"></div>
+  <div class="camera-cta">
+    <button class="btn-camera-big" id="btnGoToCamera">📷 Quay video mới</button>
+  </div>
+</div>
+
+<div id="viewCamera">
+  <video id="srcVideo" playsinline muted autoplay></video>
+  <canvas id="outputCanvas"></canvas>
   <div class="gate" id="gateStart">
-    <span class="icon-big">🎥</span>
-    <h2>Quay bằng chứng đóng gói</h2>
-    <p>Bấm nút bên dưới để bật camera. Ứng dụng sẽ tự nhận mã vận đơn qua camera và ghi lại toàn bộ quá trình đóng gói kèm dấu thời gian thực.</p>
-    <button class="btn btn-amber" id="btnEnableCamera">📷 Bật camera</button>
+    <div class="gate-icon">🎥</div>
+    <h2>Bật camera</h2>
+    <p>Ứng dụng cần quyền truy cập camera để quét mã và ghi lại quá trình đóng gói.</p>
+    <button class="btn-gate" id="btnEnableCamera">📷 Cho phép camera</button>
   </div>
-
   <div class="gate hidden" id="gateError">
-    <span class="icon-big">⚠️</span>
+    <div class="gate-icon">⚠️</div>
     <h2>Không truy cập được camera</h2>
-    <p id="gateErrorMsg">Trình duyệt từ chối quyền camera, hoặc thiết bị không hỗ trợ. Vui lòng vào cài đặt trình duyệt → Quyền → Camera → Cho phép, rồi thử lại.</p>
-    <button class="btn btn-amber" id="btnRetryCamera">🔁 Thử lại</button>
+    <p id="gateErrorMsg">Trình duyệt từ chối quyền camera. Vào cài đặt → Quyền → Camera → Cho phép, rồi thử lại.</p>
+    <button class="btn-gate" id="btnRetryCamera">🔁 Thử lại</button>
   </div>
-
-  <!-- ============ VIEW HOME ============ -->
-  <div class="view-container active" id="viewHome">
-    <div class="home-header">
-      <h1>Video Bằng Chứng</h1>
-      <p>Hệ thống lưu trữ và tra cứu video đóng gói hàng hoá</p>
-    </div>
-
-    <div class="search-box">
-      <h3>Tra cứu video</h3>
-      <div class="search-input-wrap">
-        <input type="text" id="searchCode" placeholder="Nhập mã vận đơn..." autocomplete="off">
-        <button id="btnSearch">Tìm</button>
+  <div class="cam-hud-top">
+    <button class="btn-back" id="btnBackHome">‹ Trang chủ</button>
+    <div class="rec-chip" id="recChip"><span class="reddot"></span><span id="recTimer">00:00</span></div>
+  </div>
+  <div class="scan-reticle" id="scanReticle">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="scan-line"></div>
+  </div>
+  <div class="zoom-controls" id="zoomControls">
+    <button class="zoom-btn" id="btnZoomIn">＋</button>
+    <div class="zoom-label" id="zoomLabel">1×</div>
+    <button class="zoom-btn" id="btnZoomOut">－</button>
+  </div>
+  <div class="scan-hint" id="scanHint">
+    <span>Đưa mã QR vào khung</span>
+    <button class="btn-manual" id="btnManualRecord">Quay thủ công</button>
+  </div>
+  <div class="action-overlay" id="actionOverlay">
+    <div class="action-sheet">
+      <div id="uploadGroup" style="display:none;flex-direction:column;gap:8px;">
+        <div class="action-title" id="statusLine">Đang upload...</div>
+        <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="progress-text" id="progressText">0%</div>
       </div>
-    </div>
-
-    <div class="search-result" id="searchResult">
-      <!-- Kết quả sẽ render vào đây -->
-    </div>
-
-    <div class="home-actions">
-      <button class="btn btn-amber" id="btnGoToCamera" style="padding: 20px; font-size: 18px;">📷 Quay video mới</button>
-    </div>
-  </div>
-
-  <!-- ============ VIEW CAMERA ============ -->
-  <div class="view-container" id="viewCamera">
-    <div class="topbar">
-      <button class="btn-back-home" id="btnBackHome">← Trang chủ</button>
-      <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusPillText">Chờ camera</span></div>
-    </div>
-
-  <div class="install-banner" id="installBanner">
-    <span>📲 Cài app này về màn hình chính để dùng như app thật</span>
-    <button id="btnInstall">Cài đặt</button>
-  </div>
-
-  <div class="tracking-section">
-    <div class="tracking-row">
-      <div class="tracking-input-wrap">
-        <label>Mã vận đơn</label>
-        <input type="text" id="trackingCode" placeholder="Quét mã hoặc gõ tay..." autocomplete="off" autocapitalize="characters">
+      <div class="action-title hidden" id="statusLine2"></div>
+      <button class="btn-action red hidden" id="btnStopRecord">⏹ Dừng &amp; Lưu video</button>
+      <div class="btn-row hidden" id="rowRetry">
+        <button class="btn-action indigo" id="btnRetryUpload">🔁 Thử upload lại</button>
+        <button class="btn-action outline" id="btnDiscard">🗑 Bỏ video</button>
       </div>
-      <div class="scan-toggle-btn active" id="scanToggleIcon" title="Trạng thái quét mã">▦</div>
+      <a href="#" target="_blank" class="video-link-action hidden" id="videoResultLink">🔗 Xem video vừa lưu trên Drive</a>
+      <button class="btn-action green hidden" id="btnNewRecording">🎬 Quay video khác</button>
     </div>
   </div>
-
-  <div class="stage-wrap">
-    <div class="stage" id="stage">
-      <video id="srcVideo" playsinline muted autoplay></video>
-      <canvas id="outputCanvas"></canvas>
-
-      <div class="scan-reticle" id="scanReticle">
-        <div class="corner tl"></div><div class="corner tr"></div>
-        <div class="corner bl"></div><div class="corner br"></div>
-        <div class="scan-line"></div>
-      </div>
-
-      <div class="rec-chip" id="recChip">
-        <span class="reddot"></span><span id="recTimer">00:00</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="status-line" id="statusLine">Đưa mã vận đơn vào camera để bắt đầu</div>
-
-    <!-- Nút hành động chính -->
-    <button class="btn btn-amber" id="btnPrimaryAction">▶️ Bắt đầu quay thủ công</button>
-
-    <!-- Hàng nút khi đang quay -->
-    <div class="btn-row hidden" id="rowRecording">
-      <button class="btn btn-red" id="btnStopRecord">⏹️ Dừng &amp; Lưu</button>
-    </div>
-
-    <!-- Progress bar khi upload -->
-    <div class="hidden" id="uploadProgressWrap" style="display:flex;flex-direction:column;gap:8px;">
-      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
-      <div class="progress-text" id="progressText">0%</div>
-    </div>
-
-    <!-- Link video sau khi upload thành công -->
-    <a href="#" target="_blank" class="video-link hidden" id="videoResultLink">🔗 Xem video vừa upload</a>
-
-    <!-- Hàng nút khi upload lỗi -->
-    <div class="btn-row hidden" id="rowRetry">
-      <button class="btn btn-indigo" id="btnRetryUpload">🔁 Thử upload lại</button>
-      <button class="btn btn-outline" id="btnDiscard">🗑️ Bỏ video</button>
-    </div>
-
-    <!-- Nút quay video mới -->
-    <button class="btn btn-green hidden" id="btnNewRecording">🎬 Quay video khác</button>
-  </div>
-
-  <div class="footnote">Video lưu trên Google Drive · Tự động xoá sau <span id="footAutoDeleteDays">20</span> ngày</div>
-  </div> <!-- Kết thúc viewCamera -->
+</div>
 
 <script>
-/* =========================================================================
- * CONFIG — App độc lập, tự có Apps Script riêng (không liên quan app nào khác)
- * ========================================================================= */
-const CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxYhMs_MTxPkoVmf8j2iJl_B4Cg-wUOPFNYVkNCx8R2koMR7CmulxpLA8Kr5F7jDdN55Q/exec", // ← Dán URL Web App sau khi deploy Code.gs
-  SECRET_KEY: "Kntvntd482001!", // ← PHẢI GIỐNG với SECRET_KEY trong Code.gs
-  AUTO_DELETE_DAYS: 20
-};
-document.getElementById("footAutoDeleteDays").innerText = CONFIG.AUTO_DELETE_DAYS;
+const CONFIG={APPS_SCRIPT_URL:"https://script.google.com/macros/s/AKfycbxYhMs_MTxPkoVmf8j2iJl_B4Cg-wUOPFNYVkNCx8R2koMR7CmulxpLA8Kr5F7jDdN55Q/exec",SECRET_KEY:"Kntvntd482001!",AUTO_DELETE_DAYS:20};
+if("serviceWorker"in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("service-worker.js").catch(()=>{});});}
+let deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",(e)=>{e.preventDefault();deferredInstallPrompt=e;document.getElementById("btnInstall").classList.add("show");});
+document.getElementById("btnInstall").addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;document.getElementById("btnInstall").classList.remove("show");});
+window.addEventListener("appinstalled",()=>document.getElementById("btnInstall").classList.remove("show"));
+let appState="home",mediaStream=null,currentTrack=null,zoomLevel=1,zoomMin=1,zoomMax=5,zoomStep=0.5;
+const srcVideo=document.getElementById("srcVideo"),outputCanvas=document.getElementById("outputCanvas"),ctx=outputCanvas.getContext("2d");
+let codeReader=null,scanningActive=false,lastScanTime=0,mediaRecorder=null,recordedChunks=[],recordedBlob=null,recordStartTs=0,recTimerInterval=null,currentTrackingCode="",pendingUploadTrackingCode="";
+let wakeLock=null;
+async function requestWakeLock(){try{if("wakeLock"in navigator)wakeLock=await navigator.wakeLock.request("screen");}catch(e){}}
+function releaseWakeLock(){if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null;}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&appState==="recording")requestWakeLock();});
+let audioCtx=null;
+function beep(times=1,freq=800,dur=0.2,gap=0.1){try{audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();let t=audioCtx.currentTime;for(let i=0;i<times;i++){const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type="sine";osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,t);gain.gain.exponentialRampToValueAtTime(0.35,t+0.01);gain.gain.exponentialRampToValueAtTime(0.0001,t+dur);osc.connect(gain).connect(audioCtx.destination);osc.start(t);osc.stop(t+dur+0.02);t+=dur+gap;}}catch(e){}}
+function pad2(n){return String(n).padStart(2,"0");}
+function formatElapsed(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60);return`${pad2(m)}:${pad2(s%60)}`;}
+function formatTimestampVN(d){return`${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
+function sanitizeForFileName(str){return String(str||"unknown").replace(/[^a-zA-Z0-9_-]/g,"_").slice(0,60);}
+function fileTimestamp(d){return`${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}_${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;}
+function showEl(id,show){const el=document.getElementById(id);if(!el)return;el.classList.toggle("hidden",!show);}
 
-/* =========================================================================
- * ĐĂNG KÝ SERVICE WORKER (PWA)
- * ========================================================================= */
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js").catch(err => {
-      console.warn("[SW] Đăng ký thất bại:", err);
-    });
-  });
-}
-
-/* ---------------- Cài đặt PWA thủ công (nút trong app, phòng khi Chrome không tự hiện banner) ---------------- */
-let deferredInstallPrompt = null;
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredInstallPrompt = e;
-  document.getElementById("installBanner").classList.add("show");
-});
-document.getElementById("btnInstall").addEventListener("click", async () => {
-  if (!deferredInstallPrompt) return;
-  deferredInstallPrompt.prompt();
-  await deferredInstallPrompt.userChoice;
-  deferredInstallPrompt = null;
-  document.getElementById("installBanner").classList.remove("show");
-});
-window.addEventListener("appinstalled", () => {
-  document.getElementById("installBanner").classList.remove("show");
-});
-
-/* =========================================================================
- * STATE MACHINE
- * "home" -> "gate" -> "scanning" -> "recording" -> "uploading" -> "done" / "error"
- * ========================================================================= */
-let appState = "home";
-
-/* ---------------- Điều hướng View ---------------- */
-document.getElementById("btnGoToCamera").addEventListener("click", () => {
-  document.getElementById("viewHome").classList.remove("active");
+document.getElementById("btnGoToCamera").addEventListener("click",()=>{
+  document.getElementById("viewHome").classList.add("hidden");
   document.getElementById("viewCamera").classList.add("active");
-  if (appState === "home") {
-    appState = "gate";
-    // Nếu chưa từng cấp quyền camera, hiện gateStart
-    if (!mediaStream) document.getElementById("gateStart").classList.remove("hidden");
-  }
+  if(appState==="home"){appState="gate";if(!mediaStream){document.getElementById("gateStart").classList.remove("hidden");}else{enterScanningState();}}
 });
-
-document.getElementById("btnBackHome").addEventListener("click", () => {
+document.getElementById("btnBackHome").addEventListener("click",()=>{
   document.getElementById("viewCamera").classList.remove("active");
-  document.getElementById("viewHome").classList.add("active");
-  // Nếu đang quét mã thì tạm dừng, không tắt hẳn camera để quay lại cho nhanh
-  if (appState === "scanning") scanningActive = false;
-  appState = "home";
+  document.getElementById("viewHome").classList.remove("hidden");
+  if(appState==="scanning")scanningActive=false;
+  appState="home";
 });
 
-/* ---------------- Logic Tìm kiếm ---------------- */
-document.getElementById("btnSearch").addEventListener("click", async () => {
-  const code = document.getElementById("searchCode").value.trim();
-  const resEl = document.getElementById("searchResult");
-  
-  if (!code) {
-    resEl.className = "search-result error show";
-    resEl.innerHTML = "Vui lòng nhập mã vận đơn";
-    return;
-  }
-
-  resEl.className = "search-result show";
-  resEl.innerHTML = `<div style="text-align:center; color:var(--text-dim);"><span class="dot" style="display:inline-block; animation: pulseRec 1s infinite; width:8px; height:8px; border-radius:50%; background:var(--amber); margin-right:8px;"></span>Đang tìm kiếm...</div>`;
-
-  try {
-    const payload = JSON.stringify({
-      action: "searchVideo",
-      key: CONFIG.SECRET_KEY,
-      data: { trackingCode: code }
-    });
-
-    const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: payload
-    });
-
-    const result = await response.json();
-
-    if (result.ok) {
-      resEl.className = "search-result show";
-      const dateStr = result.uploadDate ? new Date(result.uploadDate).toLocaleString("vi-VN") : "N/A";
-      resEl.innerHTML = `
-        <div class="result-item">Mã vận đơn: <strong>${result.trackingCode}</strong></div>
-        <div class="result-item">Thời gian quay: <strong>${dateStr}</strong></div>
-        <div class="result-item">Tên file: <strong style="font-size:11px;">${result.fileName}</strong></div>
-        <div class="result-actions">
-          <a href="${result.driveUrl}" target="_blank" class="btn btn-indigo" style="text-decoration:none;">🔗 Mở xem / Tải về (Google Drive)</a>
-        </div>
-      `;
-    } else {
-      resEl.className = "search-result error show";
-      resEl.innerHTML = result.message || "Không tìm thấy video nào.";
+async function doSearch(){
+  const code=document.getElementById("searchCode").value.trim();
+  const resEl=document.getElementById("searchResult");
+  if(!code){resEl.className="search-result-card notfound show";resEl.innerHTML='<div class="result-notfound-msg">Vui lòng nhập mã vận đơn</div>';return;}
+  resEl.className="search-result-card loading show";
+  resEl.innerHTML='<div style="color:var(--text-dim);text-align:center;font-size:14px;">⏳ Đang tìm kiếm...</div>';
+  try{
+    const res=await fetch(CONFIG.APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"searchVideo",key:CONFIG.SECRET_KEY,data:{trackingCode:code}})});
+    const data=await res.json();
+    if(data.ok){
+      const dateStr=data.uploadDate?new Date(data.uploadDate).toLocaleString("vi-VN"):"N/A";
+      resEl.className="search-result-card found show";
+      resEl.innerHTML=`<div class="result-label">Mã vận đơn</div><div class="result-value">${data.trackingCode}</div><div class="result-label">Thời gian quay</div><div class="result-value" style="font-size:13px">${dateStr}</div><a href="${data.driveUrl}" target="_blank" class="result-drive-btn">🔗 Mở xem / Tải về (Google Drive)</a>`;
+    }else{
+      resEl.className="search-result-card notfound show";
+      resEl.innerHTML='<div class="result-notfound-msg">❌ Không tìm thấy video cho mã này.</div>';
     }
-  } catch (e) {
-    resEl.className = "search-result error show";
-    resEl.innerHTML = "Lỗi kết nối. Vui lòng thử lại.";
-  }
-});
-document.getElementById("searchCode").addEventListener("keypress", (e) => {
-  if (e.key === "Enter") document.getElementById("btnSearch").click();
-});
-
-let mediaStream = null;
-let srcVideo = document.getElementById("srcVideo");
-let outputCanvas = document.getElementById("outputCanvas");
-let ctx = outputCanvas.getContext("2d");
-
-let codeReader = null;
-let scanningActive = false;
-let lastScanTime = 0;
-
-let mediaRecorder = null;
-let recordedChunks = [];
-let recordedBlob = null;
-let recordStartTs = 0;
-let recTimerInterval = null;
-
-let currentTrackingCode = "";
-let pendingUploadTrackingCode = "";
-
-/* ---------------- Wake Lock: giữ màn hình sáng khi đang quay ---------------- */
-let wakeLock = null;
-async function requestWakeLock() {
-  try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); }
-  catch (e) { /* Không hỗ trợ — bỏ qua */ }
+  }catch(e){resEl.className="search-result-card notfound show";resEl.innerHTML='<div class="result-notfound-msg">⚠️ Lỗi kết nối. Thử lại sau.</div>';}
 }
-function releaseWakeLock() { if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; } }
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && appState === "recording") requestWakeLock();
-});
+document.getElementById("btnSearch").addEventListener("click",doSearch);
+document.getElementById("searchCode").addEventListener("keypress",(e)=>{if(e.key==="Enter")doSearch();});
 
-/* ---------------- Beep bằng WebAudio ---------------- */
-let audioCtx = null;
-function beep(times = 1, freq = 800, dur = 0.2, gap = 0.1) {
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    let t = audioCtx.currentTime;
-    for (let i = 0; i < times; i++) {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      osc.connect(gain).connect(audioCtx.destination);
-      osc.start(t);
-      osc.stop(t + dur + 0.02);
-      t += dur + gap;
-    }
-  } catch (e) { /* Bỏ qua nếu bị chặn trước tương tác người dùng */ }
-}
+document.getElementById("btnEnableCamera").addEventListener("click",initCamera);
+document.getElementById("btnRetryCamera").addEventListener("click",initCamera);
 
-/* ---------------- UI helpers ---------------- */
-function setStatusPill(mode, text) {
-  const pill = document.getElementById("statusPill");
-  pill.className = "status-pill" + (mode ? " " + mode : "");
-  document.getElementById("statusPillText").innerText = text;
-}
-function setStatusLine(html) { document.getElementById("statusLine").innerHTML = html; }
-function showEl(id, show) { document.getElementById(id).classList.toggle("hidden", !show); }
-function pad2(n) { return String(n).padStart(2, "0"); }
-function formatElapsed(ms) {
-  const s = Math.floor(ms / 1000), m = Math.floor(s / 60), rem = s % 60;
-  return `${pad2(m)}:${pad2(rem)}`;
-}
-function formatTimestampVN(d) {
-  return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-}
-
-/* =========================================================================
- * BƯỚC 1 — BẬT CAMERA
- * ========================================================================= */
-document.getElementById("btnEnableCamera").addEventListener("click", initCamera);
-document.getElementById("btnRetryCamera").addEventListener("click", initCamera);
-
-async function initCamera() {
+async function initCamera(){
   document.getElementById("gateError").classList.add("hidden");
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: 1280, height: 720 },
-      audio: false
-    });
-  } catch (err) {
-    console.error("[Camera] Lỗi:", err);
-    document.getElementById("gateErrorMsg").innerText =
-      err.name === "NotAllowedError"
-        ? "Bạn đã từ chối quyền camera. Vui lòng vào cài đặt trình duyệt để cấp lại quyền, sau đó bấm Thử lại."
-        : "Không tìm thấy camera phù hợp hoặc thiết bị không hỗ trợ. (" + err.message + ")";
+  document.getElementById("gateStart").classList.add("hidden");
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}},audio:false});
+  }catch(err){
+    document.getElementById("gateErrorMsg").innerText=err.name==="NotAllowedError"?"Bạn đã từ chối quyền camera. Vào cài đặt trình duyệt để cấp lại quyền, rồi bấm Thử lại.":"Không tìm thấy camera phù hợp. ("+err.message+")";
     document.getElementById("gateStart").classList.add("hidden");
     document.getElementById("gateError").classList.remove("hidden");
     return;
   }
-
-  srcVideo.srcObject = mediaStream;
-  await srcVideo.play().catch(() => {});
-
-  await new Promise(resolve => {
-    if (srcVideo.videoWidth > 0) return resolve();
-    srcVideo.onloadedmetadata = () => resolve();
-  });
-
-  outputCanvas.width = srcVideo.videoWidth || 1280;
-  outputCanvas.height = srcVideo.videoHeight || 720;
-
-  document.getElementById("gateStart").classList.add("hidden");
-  document.getElementById("gateError").classList.add("hidden");
-
-  startDrawLoop();
-  initBarcodeReader();
-  enterScanningState();
+  srcVideo.srcObject=mediaStream;
+  await srcVideo.play().catch(()=>{});
+  await new Promise(resolve=>{if(srcVideo.videoWidth>0)return resolve();srcVideo.onloadedmetadata=()=>resolve();});
+  currentTrack=mediaStream.getVideoTracks()[0];
+  initZoom();resizeCanvas();startDrawLoop();initBarcodeReader();enterScanningState();
 }
 
-/* =========================================================================
- * VÒNG LẶP VẼ CAMERA + OVERLAY LÊN CANVAS
- * ========================================================================= */
-function startDrawLoop() {
-  function draw() {
-    if (srcVideo.readyState >= 2) {
-      ctx.drawImage(srcVideo, 0, 0, outputCanvas.width, outputCanvas.height);
-      if (appState === "recording") drawOverlay();
-    }
+function initZoom(){
+  if(!currentTrack)return;
+  const caps=currentTrack.getCapabilities?currentTrack.getCapabilities():{};
+  if(caps.zoom){zoomMin=caps.zoom.min||1;zoomMax=caps.zoom.max||5;zoomStep=caps.zoom.step||0.5;zoomLevel=Math.max(zoomMin,1);document.getElementById("zoomControls").style.display="flex";updateZoomUI();}
+}
+async function applyZoom(level){
+  if(!currentTrack||!currentTrack.applyConstraints)return;
+  try{await currentTrack.applyConstraints({advanced:[{zoom:level}]});zoomLevel=level;updateZoomUI();}
+  catch(e){document.getElementById("zoomControls").style.display="none";}
+}
+function updateZoomUI(){document.getElementById("zoomLabel").textContent=zoomLevel%1===0?zoomLevel+"×":zoomLevel.toFixed(1)+"×";}
+document.getElementById("btnZoomIn").addEventListener("click",()=>{applyZoom(Math.min(zoomMax,parseFloat((zoomLevel+zoomStep).toFixed(1))));});
+document.getElementById("btnZoomOut").addEventListener("click",()=>{applyZoom(Math.max(zoomMin,parseFloat((zoomLevel-zoomStep).toFixed(1))));});
+
+function resizeCanvas(){outputCanvas.width=srcVideo.videoWidth||1280;outputCanvas.height=srcVideo.videoHeight||720;}
+window.addEventListener("resize",()=>{if(mediaStream)resizeCanvas();});
+if(screen.orientation)screen.orientation.addEventListener("change",()=>{if(mediaStream)setTimeout(resizeCanvas,300);});
+
+function startDrawLoop(){
+  function draw(){
+    if(srcVideo.readyState>=2)ctx.drawImage(srcVideo,0,0,outputCanvas.width,outputCanvas.height);
+    if(appState==="recording")drawOverlay();
     requestAnimationFrame(draw);
   }
   draw();
 }
-
-function drawOverlay() {
-  const w = outputCanvas.width, h = outputCanvas.height;
-  const fontSize = Math.max(20, Math.round(w * 0.032));
-  ctx.font = `700 ${fontSize}px ${getComputedStyle(document.body).getPropertyValue("--mono") || "monospace"}`;
-  ctx.textBaseline = "bottom";
-  ctx.lineWidth = Math.max(3, fontSize * 0.16);
-  ctx.strokeStyle = "rgba(0,0,0,0.85)";
-  ctx.fillStyle = "#ffffff";
-  ctx.lineJoin = "round";
-
-  const margin = Math.round(w * 0.025);
-
-  const codeText = currentTrackingCode || "—";
-  ctx.textAlign = "left";
-  ctx.strokeText(codeText, margin, h - margin);
-  ctx.fillText(codeText, margin, h - margin);
-
-  const timeText = formatTimestampVN(new Date());
-  ctx.textAlign = "right";
-  ctx.strokeText(timeText, w - margin, h - margin);
-  ctx.fillText(timeText, w - margin, h - margin);
+function drawOverlay(){
+  const w=outputCanvas.width,h=outputCanvas.height;
+  const fs=Math.max(20,Math.round(w*0.032));
+  ctx.font=`700 ${fs}px monospace`;ctx.textBaseline="bottom";
+  ctx.lineWidth=Math.max(3,fs*0.18);ctx.strokeStyle="rgba(0,0,0,.85)";ctx.fillStyle="#fff";ctx.lineJoin="round";
+  const mg=Math.round(w*0.025);
+  ctx.textAlign="left";ctx.strokeText(currentTrackingCode||"—",mg,h-mg);ctx.fillText(currentTrackingCode||"—",mg,h-mg);
+  ctx.textAlign="right";const ts=formatTimestampVN(new Date());ctx.strokeText(ts,w-mg,h-mg);ctx.fillText(ts,w-mg,h-mg);
 }
 
-/* =========================================================================
- * QUÉT MÃ VẠCH / QR — CHẠY NỀN LIÊN TỤC
- * Ghi chú: decoder chạy nền xuyên suốt kể cả lúc quay, chỉ ẩn khung ngắm đi
- * sau mã lần 1 để UI đỡ rối — nhờ vậy mã lần 2 vẫn kích hoạt được lệnh dừng.
- * ========================================================================= */
-/* Canvas tạm — dùng riêng cho jsQR polling (tách biệt với outputCanvas) */
-const _scanCanvas = document.createElement("canvas");
-const _scanCtx    = _scanCanvas.getContext("2d", { willReadFrequently: true });
-
-function initBarcodeReader() {
-  /* ── TRACK 1: ZXing — bắt barcode 1D (CODE_128, EAN, v.v.) ─────────────────
-   * Dùng đúng API chính thức decodeFromVideoElementContinuously.
-   * Callback nhận (result, err); err = NotFoundException là bình thường, bỏ qua.
-   * ─────────────────────────────────────────────────────────────────────────── */
-  const hints = new Map();
-  const formats = [
-    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-    ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
-    ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX, ZXing.BarcodeFormat.ITF
-  ];
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-
-  codeReader = new ZXing.BrowserMultiFormatReader(hints);
-  codeReader.decodeFromVideoElementContinuously(srcVideo, (result, _err) => {
-    /* _err = NotFoundException khi không thấy mã — hoàn toàn bình thường, bỏ qua */
-    if (result) handleDecodedCode(result.getText());
-  });
-
-  /* ── TRACK 2: jsQR — bắt QR code (đáng tin hơn ZXing cho QR) ───────────────
-   * Polling mỗi 300 ms: chụp frame từ srcVideo vào canvas tạm,
-   * gọi jsQR(imageData) — thuần JS, không WebAssembly, rất ổn định.
-   * ─────────────────────────────────────────────────────────────────────────── */
-  if (typeof jsQR === "function") {
-    (function jsqrLoop() {
-      if (srcVideo.readyState >= 2 && srcVideo.videoWidth > 0 &&
-          (appState === "scanning" || appState === "recording")) {
-        _scanCanvas.width  = srcVideo.videoWidth;
-        _scanCanvas.height = srcVideo.videoHeight;
-        _scanCtx.drawImage(srcVideo, 0, 0);
-        try {
-          const imgData = _scanCtx.getImageData(0, 0, _scanCanvas.width, _scanCanvas.height);
-          const qr = jsQR(imgData.data, imgData.width, imgData.height,
-                          { inversionAttempts: "dontInvert" });
-          if (qr && qr.data) handleDecodedCode(qr.data);
-        } catch (e) { /* bỏ qua lỗi đọc frame */ }
+const _scanCanvas=document.createElement("canvas"),_scanCtx=_scanCanvas.getContext("2d",{willReadFrequently:true});
+function initBarcodeReader(){
+  const hints=new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.QR_CODE,ZXing.BarcodeFormat.DATA_MATRIX,ZXing.BarcodeFormat.ITF]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+  codeReader=new ZXing.BrowserMultiFormatReader(hints);
+  codeReader.decodeFromVideoElementContinuously(srcVideo,(result)=>{if(result)handleDecodedCode(result.getText());});
+  if(typeof jsQR==="function"){
+    (function jsqrLoop(){
+      if(srcVideo.readyState>=2&&srcVideo.videoWidth>0&&(appState==="scanning"||appState==="recording")){
+        _scanCanvas.width=srcVideo.videoWidth;_scanCanvas.height=srcVideo.videoHeight;_scanCtx.drawImage(srcVideo,0,0);
+        try{const imgData=_scanCtx.getImageData(0,0,_scanCanvas.width,_scanCanvas.height);const qr=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:"dontInvert"});if(qr&&qr.data)handleDecodedCode(qr.data);}catch(e){}
       }
-      setTimeout(jsqrLoop, 300);
+      setTimeout(jsqrLoop,300);
     })();
   }
 }
 
-function handleDecodedCode(text) {
-  const now = Date.now();
-  if (now - lastScanTime < 1500) return;
-  lastScanTime = now;
-
-  if (appState === "scanning") {
-    if (!scanningActive) return;
-    // Tự động bỏ qua quét nếu đang ở màn hình Home
-    if (!document.getElementById("viewCamera").classList.contains("active")) return;
-    document.getElementById("trackingCode").value = text;
-    startRecording(text);
-  } else if (appState === "recording") {
-    stopRecordingAndUpload();
-  }
-}
-
-/* =========================================================================
- * TRẠNG THÁI: SCANNING
- * ========================================================================= */
-function enterScanningState() {
-  appState = "scanning";
-  scanningActive = true;
-
-  document.getElementById("stage").className = "stage state-scan";
-  document.getElementById("scanReticle").style.display = "block";
-  document.getElementById("recChip").classList.remove("show");
-  document.getElementById("trackingCode").disabled = false;
-
-  setStatusPill("", "Đang chờ quét mã");
-  setStatusLine("Đưa mã vận đơn vào camera để bắt đầu");
-
-  showEl("rowRecording", false);
-  showEl("rowRetry", false);
-  showEl("btnNewRecording", false);
-  showEl("uploadProgressWrap", false);
-  showEl("videoResultLink", false);
-
-  const primaryBtn = document.getElementById("btnPrimaryAction");
-  primaryBtn.classList.remove("hidden");
-  primaryBtn.className = "btn btn-amber";
-  primaryBtn.innerHTML = "▶️ Bắt đầu quay thủ công";
-  primaryBtn.disabled = false;
-}
-
-/* =========================================================================
- * TRẠNG THÁI: RECORDING
- * ========================================================================= */
-function startRecording(trackingCodeValue) {
-  const codeInput = document.getElementById("trackingCode");
-  const finalCode = (trackingCodeValue || codeInput.value || "").trim();
-
-  if (!finalCode) {
-    alert("Vui lòng nhập hoặc quét mã vận đơn trước khi quay!");
-    return;
-  }
-
-  currentTrackingCode = finalCode;
-  codeInput.value = finalCode;
-  codeInput.disabled = true;
-
-  appState = "recording";
-  document.getElementById("stage").className = "stage state-rec";
-  document.getElementById("scanReticle").style.display = "none";
-  document.getElementById("recChip").classList.add("show");
-
-  setStatusPill("rec", "Đang quay");
-  setStatusLine(`Đang quay bằng chứng cho mã <strong>${finalCode}</strong>`);
-
-  document.getElementById("btnPrimaryAction").classList.add("hidden");
-  showEl("rowRecording", true);
-  showEl("rowRetry", false);
-  showEl("btnNewRecording", false);
-
-  beep(1, 800, 0.2);
-  requestWakeLock();
-
-  recordedChunks = [];
-  const canvasStream = outputCanvas.captureStream(30);
-
-  const mimeCandidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/mp4", "video/webm"];
-  const chosenMime = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || "";
-
-  try {
-    mediaRecorder = chosenMime
-      ? new MediaRecorder(canvasStream, { mimeType: chosenMime, videoBitsPerSecond: 1_500_000 })
-      : new MediaRecorder(canvasStream);
-  } catch (e) {
-    console.error("[Recorder] Lỗi:", e);
-    alert("Thiết bị/trình duyệt này không hỗ trợ quay video. Vui lòng thử bằng Chrome trên Android.");
+function handleDecodedCode(text){
+  const now=Date.now();if(now-lastScanTime<1500)return;lastScanTime=now;
+  if(!document.getElementById("viewCamera").classList.contains("active"))return;
+  if(appState==="scanning"){if(!scanningActive)return;startRecording(text);}
+  else if(appState==="recording"){stopRecordingAndUpload();}
+  else if(appState==="done"){
+    currentTrackingCode="";recordedBlob=null;recordedChunks=[];
+    document.getElementById("actionOverlay").classList.remove("show");
     enterScanningState();
-    return;
+    setTimeout(()=>{if(appState==="scanning")startRecording(text);},150);
   }
-
-  mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
-  mediaRecorder.onstop = onRecorderStopped;
-  mediaRecorder.start(1000);
-
-  recordStartTs = Date.now();
-  recTimerInterval = setInterval(() => {
-    document.getElementById("recTimer").innerText = formatElapsed(Date.now() - recordStartTs);
-  }, 500);
 }
 
-document.getElementById("btnStopRecord").addEventListener("click", stopRecordingAndUpload);
-document.getElementById("btnPrimaryAction").addEventListener("click", () => {
-  if (appState === "scanning") startRecording(document.getElementById("trackingCode").value.trim());
-});
-
-function stopRecordingAndUpload() {
-  if (appState !== "recording" || !mediaRecorder) return;
-  if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
-  clearInterval(recTimerInterval);
-  beep(2, 600, 0.2, 0.1);
-  releaseWakeLock();
-}
-
-function onRecorderStopped() {
-  const mime = mediaRecorder.mimeType || "video/webm";
-  recordedBlob = new Blob(recordedChunks, { type: mime });
-  pendingUploadTrackingCode = currentTrackingCode;
+function enterScanningState(){
+  appState="scanning";scanningActive=true;
+  document.getElementById("scanReticle").style.display="block";
   document.getElementById("recChip").classList.remove("show");
-  uploadVideoToDrive(recordedBlob, pendingUploadTrackingCode);
+  document.getElementById("actionOverlay").classList.remove("show");
+  document.getElementById("scanHint").classList.remove("hidden");
 }
 
-/* =========================================================================
- * TRẠNG THÁI: UPLOADING — Upload lên Google Drive qua Apps Script
- * Dùng fetch() thay vì XHR vì Apps Script redirect POST request,
- * XHR không theo được cross-origin redirect (xhr.onerror vì CORS),
- * còn fetch() xử lý redirect tự động và đúng cách.
- * ========================================================================= */
-async function uploadVideoToDrive(blob, trackingCodeValue) {
-  appState = "uploading";
-  document.getElementById("stage").className = "stage";
+function startRecording(trackingCodeValue){
+  const finalCode=(trackingCodeValue||"").trim();
+  if(!finalCode){const m=prompt("Nhập mã vận đơn:");if(!m||!m.trim())return;startRecording(m.trim());return;}
+  currentTrackingCode=finalCode;appState="recording";
+  document.getElementById("scanReticle").style.display="none";
+  document.getElementById("recChip").classList.add("show");
+  document.getElementById("scanHint").classList.add("hidden");
+  document.getElementById("actionOverlay").classList.add("show");
+  document.getElementById("uploadGroup").style.display="none";
+  showEl("statusLine2",false);showEl("btnStopRecord",true);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);
+  beep(1,800,0.2);requestWakeLock();
+  recordedChunks=[];
+  const canvasStream=outputCanvas.captureStream(30);
+  const mimes=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/mp4","video/webm"];
+  const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||"";
+  try{mediaRecorder=mime?new MediaRecorder(canvasStream,{mimeType:mime,videoBitsPerSecond:2000000}):new MediaRecorder(canvasStream);}
+  catch(e){alert("Thiết bị không hỗ trợ quay video. Dùng Chrome trên Android.");enterScanningState();return;}
+  mediaRecorder.ondataavailable=(e)=>{if(e.data&&e.data.size>0)recordedChunks.push(e.data);};
+  mediaRecorder.onstop=onRecorderStopped;
+  mediaRecorder.start(1000);
+  recordStartTs=Date.now();
+  recTimerInterval=setInterval(()=>{document.getElementById("recTimer").innerText=formatElapsed(Date.now()-recordStartTs);},500);
+}
 
-  setStatusPill("upload", "Đang upload");
-  setStatusLine(`Đang upload video lên Google Drive...`);
+document.getElementById("btnStopRecord").addEventListener("click",stopRecordingAndUpload);
+document.getElementById("btnManualRecord").addEventListener("click",()=>{if(appState==="scanning")startRecording("");});
 
-  document.getElementById("btnPrimaryAction").classList.add("hidden");
-  showEl("rowRecording", false);
-  showEl("rowRetry", false);
-  showEl("btnNewRecording", false);
-  showEl("videoResultLink", false);
-  showEl("uploadProgressWrap", true);
-  updateProgress(0);
+function stopRecordingAndUpload(){
+  if(appState!=="recording"||!mediaRecorder)return;
+  if(mediaRecorder.state!=="inactive")mediaRecorder.stop();
+  clearInterval(recTimerInterval);beep(2,600,0.2,0.1);releaseWakeLock();
+}
+function onRecorderStopped(){
+  recordedBlob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||"video/webm"});
+  pendingUploadTrackingCode=currentTrackingCode;
+  document.getElementById("recChip").classList.remove("show");
+  uploadVideoToDrive(recordedBlob,pendingUploadTrackingCode);
+}
 
-  const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
-  const fileName = `${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
-  const uploadDateIso = new Date().toISOString();
-
-  /* Đọc blob thành base64 */
+async function uploadVideoToDrive(blob,trackingCodeValue){
+  appState="uploading";
+  document.getElementById("actionOverlay").classList.add("show");
+  document.getElementById("scanReticle").style.display="none";
+  document.getElementById("scanHint").classList.add("hidden");
+  showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);
+  const ug=document.getElementById("uploadGroup");ug.style.display="flex";
+  document.getElementById("statusLine").innerHTML=`⏫ Đang upload mã <strong>${trackingCodeValue}</strong>...`;
+  showEl("statusLine2",false);updateProgress(0);
+  const ext=(blob.type||"video/webm").includes("mp4")?"mp4":"webm";
+  const fileName=`${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
   let base64;
-  try {
-    base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = () => resolve(reader.result.split(",")[1]);
-      reader.onerror = () => reject(new Error("Không đọc được dữ liệu video từ bộ nhớ máy."));
+  try{
+    base64=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result.split(",")[1]);
+      reader.onerror=()=>reject(new Error("Không đọc được dữ liệu video."));
       reader.readAsDataURL(blob);
     });
-  } catch (e) {
-    enterErrorState(e.message);
-    return;
-  }
-
-  const payload = JSON.stringify({
-    action: "uploadVideo",
-    key: CONFIG.SECRET_KEY,
-    data: {
-      base64: base64,
-      mimeType: blob.type || "video/webm",
-      fileName: fileName,
-      trackingCode: trackingCodeValue,
-      uploadDate: uploadDateIso
-    }
-  });
-
-  /* Thanh tiến trình giả — fetch không expose upload progress,
-   * nhưng vẫn cho người dùng thấy app đang hoạt động            */
-  let fakePct = 0;
-  const fakeTimer = setInterval(() => {
-    /* Tăng nhanh lúc đầu, chậm dần khi gần 90% — chờ phản hồi server */
-    fakePct = fakePct < 70 ? fakePct + 4 : fakePct < 90 ? fakePct + 0.8 : fakePct;
-    updateProgress(Math.round(fakePct));
-  }, 400);
-
-  try {
-    const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" }, // text/plain = simple request, tránh CORS preflight
-      body: payload
-    });
-
-    clearInterval(fakeTimer);
-    updateProgress(100);
-
-    const text = await response.text();
-    let json;
-    try { json = JSON.parse(text); }
-    catch (e) { enterErrorState("Phản hồi từ máy chủ không hợp lệ."); return; }
-
-    if (json.error) { enterErrorState(json.error); return; }
+  }catch(e){enterErrorState(e.message);return;}
+  const payload=JSON.stringify({action:"uploadVideo",key:CONFIG.SECRET_KEY,data:{base64,mimeType:blob.type||"video/webm",fileName,trackingCode:trackingCodeValue,uploadDate:new Date().toISOString()}});
+  let fakePct=0;
+  const fakeTimer=setInterval(()=>{fakePct=fakePct<70?fakePct+4:fakePct<90?fakePct+0.8:fakePct;updateProgress(Math.round(fakePct));},400);
+  try{
+    const response=await fetch(CONFIG.APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload});
+    clearInterval(fakeTimer);updateProgress(100);
+    const text=await response.text();
+    let json;try{json=JSON.parse(text);}catch(e){enterErrorState("Phản hồi không hợp lệ.");return;}
+    if(json.error){enterErrorState(json.error);return;}
     enterDoneState(json);
-
-  } catch (err) {
+  }catch(err){
     clearInterval(fakeTimer);
-    /* fetch ném lỗi khi mạng đứt hoàn toàn hoặc CORS block tuyệt đối */
-    const msg = (err.name === "TypeError")
-      ? "Lỗi kết nối tới máy chủ. Kiểm tra Internet và đảm bảo Apps Script đã deploy đúng (Who has access: Anyone)."
-      : "Upload thất bại: " + err.message;
-    enterErrorState(msg);
+    enterErrorState(err.name==="TypeError"?"Lỗi kết nối. Kiểm tra Internet và Apps Script.":"Upload thất bại: "+err.message);
   }
 }
 
-function updateProgress(pct) {
-  document.getElementById("progressBar").style.width = pct + "%";
-  document.getElementById("progressText").innerText = pct + "%";
+function updateProgress(pct){document.getElementById("progressBar").style.width=pct+"%";document.getElementById("progressText").innerText=pct+"%";}
+
+function enterDoneState(uploadResult){
+  appState="done";
+  document.getElementById("uploadGroup").style.display="none";
+  showEl("statusLine2",true);
+  document.getElementById("statusLine2").innerHTML=`✅ Đã lưu! Mã <strong>${pendingUploadTrackingCode}</strong><br><span style="font-size:12px;opacity:.7">Quét mã mới để quay tiếp</span>`;
+  showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("btnNewRecording",true);
+  if(uploadResult&&uploadResult.driveUrl){document.getElementById("videoResultLink").href=uploadResult.driveUrl;showEl("videoResultLink",true);}
+  recordedBlob=null;recordedChunks=[];scanningActive=true;
 }
 
-function sanitizeForFileName(str) {
-  return String(str || "unknown").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 60);
-}
-function fileTimestamp(d) {
-  return `${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}_${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
-}
-
-/* =========================================================================
- * TRẠNG THÁI: DONE
- * ========================================================================= */
-function enterDoneState(uploadResult) {
-  appState = "done";
-  setStatusPill("done", "Hoàn tất");
-  setStatusLine(`✅ Đã lưu thành công cho mã <strong>${pendingUploadTrackingCode}</strong>! Video sẽ tự động xoá sau ${CONFIG.AUTO_DELETE_DAYS} ngày.`);
-
-  showEl("uploadProgressWrap", false);
-  showEl("rowRetry", false);
-  showEl("rowRecording", false);
-  document.getElementById("btnPrimaryAction").classList.add("hidden");
-  showEl("btnNewRecording", true);
-
-  if (uploadResult && uploadResult.driveUrl) {
-    const link = document.getElementById("videoResultLink");
-    link.href = uploadResult.driveUrl;
-    showEl("videoResultLink", true);
-  }
-
-  recordedBlob = null;
-  recordedChunks = [];
+function enterErrorState(message){
+  appState="error";
+  document.getElementById("uploadGroup").style.display="none";
+  showEl("statusLine2",true);
+  document.getElementById("statusLine2").innerHTML=`⚠️ ${message||"Lỗi không xác định"}<br><span style="font-size:12px;opacity:.7">Video vẫn giữ trên máy</span>`;
+  showEl("btnStopRecord",false);showEl("rowRetry",true);showEl("btnNewRecording",false);
 }
 
-/* =========================================================================
- * TRẠNG THÁI: ERROR — giữ nguyên blob để cho phép thử lại, không mất video
- * ========================================================================= */
-function enterErrorState(message) {
-  appState = "error";
-  setStatusPill("err", "Lỗi upload");
-  setStatusLine(`⚠️ Upload thất bại: ${message || "Lỗi không xác định"}. Video vẫn được giữ trên máy, bấm thử lại khi có mạng.`);
-
-  showEl("uploadProgressWrap", false);
-  document.getElementById("btnPrimaryAction").classList.add("hidden");
-  showEl("rowRecording", false);
-  showEl("rowRetry", true);
-  showEl("btnNewRecording", false);
-}
-
-document.getElementById("btnRetryUpload").addEventListener("click", () => {
-  if (recordedBlob) uploadVideoToDrive(recordedBlob, pendingUploadTrackingCode);
-  else { alert("Không còn dữ liệu video trong bộ nhớ. Vui lòng quay lại từ đầu."); enterScanningState(); }
+document.getElementById("btnRetryUpload").addEventListener("click",()=>{
+  if(recordedBlob)uploadVideoToDrive(recordedBlob,pendingUploadTrackingCode);
+  else{alert("Không còn dữ liệu video. Vui lòng quay lại từ đầu.");enterScanningState();}
 });
-
-document.getElementById("btnDiscard").addEventListener("click", () => {
-  if (confirm("Bỏ video này? Sẽ không thể khôi phục lại.")) {
-    recordedBlob = null; recordedChunks = [];
-    document.getElementById("trackingCode").disabled = false;
-    document.getElementById("trackingCode").value = "";
-    currentTrackingCode = "";
-    enterScanningState();
-  }
+document.getElementById("btnDiscard").addEventListener("click",()=>{
+  if(confirm("Bỏ video này? Không thể khôi phục.")){recordedBlob=null;recordedChunks=[];currentTrackingCode="";document.getElementById("actionOverlay").classList.remove("show");enterScanningState();}
 });
-
-/* =========================================================================
- * QUAY VIDEO MỚI
- * ========================================================================= */
-document.getElementById("btnNewRecording").addEventListener("click", () => {
-  document.getElementById("trackingCode").disabled = false;
-  document.getElementById("trackingCode").value = "";
-  currentTrackingCode = "";
-  recordedBlob = null; recordedChunks = [];
+document.getElementById("btnNewRecording").addEventListener("click",()=>{
+  currentTrackingCode="";recordedBlob=null;recordedChunks=[];
+  document.getElementById("actionOverlay").classList.remove("show");
   enterScanningState();
-});
-
-/* ---------------- Bật/tắt hiển thị chế độ quét (chỉ mang tính hiển thị) ---------------- */
-document.getElementById("scanToggleIcon").addEventListener("click", () => {
-  if (appState !== "scanning") return;
-  scanningActive = !scanningActive;
-  const icon = document.getElementById("scanToggleIcon");
-  icon.classList.toggle("active", scanningActive);
-  document.getElementById("scanReticle").style.display = scanningActive ? "block" : "none";
-});
-
-document.getElementById("trackingCode").addEventListener("input", (e) => {
-  if (appState === "scanning") currentTrackingCode = e.target.value.trim();
 });
 </script>
 </body>
