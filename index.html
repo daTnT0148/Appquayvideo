@@ -20,22 +20,24 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:
 body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 
 /* HOME */
-#viewHome{display:flex;flex-direction:column;height:100%;overflow-y:auto;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);}
+#viewHome{display:flex;flex-direction:column;height:100%;background:var(--bg);}
 #viewHome.hidden{display:none;}
-.home-topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0;}
-.home-logo{font-size:20px;font-weight:800;letter-spacing:-0.5px;color:var(--amber);}
+
+.home-header{padding:max(20px,env(safe-area-inset-top)) 20px 0;display:flex;align-items:center;justify-content:space-between;}
+.home-logo-wrap{display:flex;align-items:center;gap:12px;}
+.home-logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--amber),#ff9500);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.home-logo-text{font-size:18px;font-weight:800;color:var(--text);}
+.home-logo-sub{font-size:12px;color:var(--text-dim);font-weight:500;margin-top:1px;}
 .install-badge{display:none;background:var(--indigo);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;}
 .install-badge.show{display:block;}
-.home-hero{padding:28px 20px 0;}
-.home-hero h2{font-size:26px;font-weight:800;line-height:1.2;letter-spacing:-0.5px;margin-bottom:8px;}
-.home-hero p{font-size:14px;color:var(--text-dim);line-height:1.6;}
-.search-card{margin:20px 20px 0;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;}
-.search-card-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-dim);margin-bottom:10px;}
-.search-row{display:flex;gap:10px;}
-.search-row input{flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:14px;color:var(--text);font-family:var(--mono);font-size:15px;padding:13px 14px;outline:none;}
-.search-row input:focus{border-color:var(--amber);}
-.search-row button{background:var(--indigo);color:#fff;border:none;border-radius:14px;padding:0 20px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;}
-.search-result-card{margin:12px 20px 0;border-radius:16px;padding:16px;display:none;}
+
+.search-bar-wrap{padding:16px 20px 0;}
+.search-bar{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:10px 14px;}
+.search-bar input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:15px;}
+.search-bar input::placeholder{color:var(--text-dim);}
+.search-bar button{background:var(--amber);color:#1a0e00;border:none;border-radius:10px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
+
+.search-result-card{margin:10px 20px 0;border-radius:16px;padding:14px;display:none;}
 .search-result-card.show{display:block;}
 .search-result-card.found{background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);}
 .search-result-card.notfound{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);}
@@ -49,8 +51,35 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .status-badge.loading{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2);}
 .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
-.camera-cta{margin:20px 20px 0;padding-bottom:max(20px,env(safe-area-inset-bottom));}
-.btn-camera-big{width:100%;background:var(--amber);color:#1a0e00;border:none;border-radius:20px;padding:22px;font-size:18px;font-weight:800;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;}
+
+/* RECENT VIDEOS */
+.recent-section{flex:1;overflow-y:auto;padding:16px 20px 0;}
+.recent-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.recent-title{font-size:13px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;}
+.recent-count{font-size:12px;color:var(--text-dim);}
+.recent-loading{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;padding:16px 0;}
+.video-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);position:relative;}
+.video-item:last-child{border-bottom:none;}
+.video-item-icon{width:42px;height:42px;border-radius:12px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.25);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.video-item-info{flex:1;min-width:0;}
+.video-item-code{font-size:14px;font-weight:700;font-family:var(--mono);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.video-item-meta{font-size:12px;color:var(--text-dim);margin-top:3px;}
+.video-item-menu-btn{width:36px;height:36px;border-radius:50%;background:none;border:none;color:var(--text-dim);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;line-height:1;}
+.video-item-menu-btn:active{background:var(--card2);}
+
+/* DROPDOWN MENU */
+.dropdown-menu{position:absolute;right:0;top:52px;background:#232323;border:1px solid var(--border);border-radius:14px;padding:6px;z-index:50;min-width:160px;}
+.dropdown-menu.hidden{display:none;}
+.dropdown-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;color:var(--text);border:none;background:none;width:100%;text-align:left;}
+.dropdown-item:hover{background:var(--card2);}
+.dropdown-item.red{color:var(--red);}
+
+/* FLOATING RECORD BUTTON */
+.fab-wrap{padding:16px 20px max(20px,env(safe-area-inset-bottom));flex-shrink:0;}
+.fab-btn{width:100%;background:linear-gradient(135deg,var(--amber) 0%,#ff8c00 100%);color:#1a0e00;border:none;border-radius:20px;padding:18px 24px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;position:relative;overflow:hidden;}
+.fab-btn::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none;}
+.fab-btn-icon{width:32px;height:32px;background:rgba(0,0,0,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.fab-btn:active{opacity:.88;}
 
 /* CAMERA VIEW */
 #viewCamera{display:none;position:fixed;inset:0;background:#000;z-index:100;}
@@ -113,25 +142,41 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 <body>
 
 <div id="viewHome">
-  <div class="home-topbar">
-    <div class="home-logo">📦 VBC</div>
+  <div class="home-header">
+    <div class="home-logo-wrap">
+      <div class="home-logo-icon">📦</div>
+      <div>
+        <div class="home-logo-text">VBC</div>
+        <div class="home-logo-sub">Video Bằng Chứng Đóng Gói</div>
+      </div>
+    </div>
     <button class="install-badge" id="btnInstall">📲 Cài đặt</button>
   </div>
-  <div class="home-hero">
-    <h2>Video Bằng Chứng<br>Đóng Gói</h2>
-    <p>Tra cứu video đã lưu theo mã vận đơn, hoặc bắt đầu quay mới.</p>
-  </div>
-  <div class="search-card">
-    <div class="search-card-label">🔍 Tra cứu video</div>
-    <div class="search-row">
-      <input type="text" id="searchCode" placeholder="Nhập mã vận đơn..." autocomplete="off" autocorrect="off" spellcheck="false">
+
+  <div class="search-bar-wrap">
+    <div class="search-bar">
+      <span style="font-size:16px;">🔍</span>
+      <input type="text" id="searchCode" placeholder="Tìm mã vận đơn..." autocomplete="off" autocorrect="off" spellcheck="false">
       <button id="btnSearch">Tìm</button>
     </div>
   </div>
   <div class="search-result-card" id="searchResult"></div>
-  <div style="flex:1;"></div>
-  <div class="camera-cta">
-    <button class="btn-camera-big" id="btnGoToCamera">📷 Quay video mới</button>
+
+  <div class="recent-section">
+    <div class="recent-header">
+      <span class="recent-title">🕒 Video gần đây</span>
+      <span class="recent-count" id="recentCount"></span>
+    </div>
+    <div id="recentList">
+      <div class="recent-loading"><span class="spinner"></span> Đang tải danh sách...</div>
+    </div>
+  </div>
+
+  <div class="fab-wrap">
+    <button class="fab-btn" id="btnGoToCamera">
+      <div class="fab-btn-icon">🎥</div>
+      Quay video đơn hàng
+    </button>
   </div>
 </div>
 
@@ -258,6 +303,7 @@ document.getElementById("btnBackHome").addEventListener("click",()=>{
   if(appState==="scanning")scanningActive=false;
   if(scanInterval){clearInterval(scanInterval);scanInterval=null;}
   appState="home";
+  loadRecentVideos(); // Refresh list when returning home
 });
 
 // --- ORIENTATION TOGGLE ---
@@ -289,7 +335,82 @@ document.getElementById("btnToggleOrient").addEventListener("click", () => {
   if (mediaStream) resizeCanvas();
 });
 
+// --- RECENT VIDEOS ---
+let activeDropdown = null;
+
+function closeActiveDropdown() {
+  if (activeDropdown) { activeDropdown.classList.add("hidden"); activeDropdown = null; }
+}
+document.addEventListener("click", closeActiveDropdown);
+
+async function loadRecentVideos() {
+  const listEl = document.getElementById("recentList");
+  const countEl = document.getElementById("recentCount");
+  try {
+    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "getRecentVideos", key: CONFIG.SECRET_KEY, data: { limit: 5 } })
+    });
+    const data = await res.json();
+    if (data.ok && data.videos && data.videos.length > 0) {
+      countEl.textContent = data.videos.length + " video";
+      listEl.innerHTML = data.videos.map((v, i) => {
+        const dateStr = v.uploadDate ? new Date(v.uploadDate).toLocaleString("vi-VN", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "N/A";
+        return `<div class="video-item">
+          <div class="video-item-icon">🎬</div>
+          <div class="video-item-info">
+            <div class="video-item-code">${v.trackingCode}</div>
+            <div class="video-item-meta">🕐 ${dateStr}</div>
+          </div>
+          <button class="video-item-menu-btn" id="menuBtn${i}" onclick="toggleDropdown(event,'drop${i}')">⋮</button>
+          <div class="dropdown-menu hidden" id="drop${i}">
+            <a href="${v.driveUrl}" target="_blank" class="dropdown-item" onclick="closeActiveDropdown()">⬇️ Tải về / Xem</a>
+            <button class="dropdown-item red" onclick="deleteRecentVideo('${v.trackingCode}','drop${i}')">🗑 Xóa video</button>
+          </div>
+        </div>`;
+      }).join("");
+    } else if (data.ok && (!data.videos || data.videos.length === 0)) {
+      countEl.textContent = "";
+      listEl.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:16px 0;text-align:center;">Chưa có video nào được lưu.</div>';
+    } else {
+      countEl.textContent = "";
+      listEl.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:16px 0;">⚠️ Không tải được danh sách.</div>';
+    }
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:16px 0;">⚠️ Lỗi kết nối máy chủ.</div>';
+  }
+}
+
+window.toggleDropdown = function(e, dropId) {
+  e.stopPropagation();
+  const drop = document.getElementById(dropId);
+  if (activeDropdown && activeDropdown !== drop) activeDropdown.classList.add("hidden");
+  drop.classList.toggle("hidden");
+  activeDropdown = drop.classList.contains("hidden") ? null : drop;
+};
+
+window.deleteRecentVideo = async function(code, dropId) {
+  closeActiveDropdown();
+  if (!confirm(`Xóa video mã ${code}?`)) return;
+  const listEl = document.getElementById("recentList");
+  const oldHTML = listEl.innerHTML;
+  listEl.innerHTML = '<div class="recent-loading"><span class="spinner"></span> Đang xóa...</div>';
+  try {
+    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "deleteVideo", key: CONFIG.SECRET_KEY, data: { trackingCode: code } })
+    });
+    const data = await res.json();
+    if (data.ok) { loadRecentVideos(); }
+    else { alert("Lỗi: " + (data.error || "Không xác định")); listEl.innerHTML = oldHTML; }
+  } catch(e) { alert("Lỗi kết nối."); listEl.innerHTML = oldHTML; }
+};
+
+// Load recent videos when app opens
+loadRecentVideos();
+
 // --- SEARCH ---
+
 async function doSearch(){
   const code=document.getElementById("searchCode").value.trim();
   const resEl=document.getElementById("searchResult");

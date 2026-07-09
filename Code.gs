@@ -69,6 +69,7 @@ function doPost(e) {
       case "cleanupVideos": result = cleanupOldVideos();      break;
       case "searchVideo":   result = searchVideo(body.data);  break;
       case "deleteVideo":   result = deleteVideo(body.data);  break;
+      case "getRecentVideos": result = getRecentVideos(body.data); break;
       default: result = { error: "Unknown action: " + action };
     }
   } catch (err) {
@@ -256,3 +257,34 @@ function deleteVideo(data) {
     return { error: "Lỗi xoá video: " + err.message };
   }
 }
+
+/**
+ * Action "getRecentVideos" — trả về N video mới nhất
+ * data: { limit } (mặc định 5)
+ */
+function getRecentVideos(data) {
+  try {
+    const limit = (data && data.limit) ? parseInt(data.limit) : 5;
+    const sheet = ensureVideoLogSheet();
+    const rows = sheet.getDataRange().getValues();
+    
+    const videos = [];
+    // Duyệt ngược (mới nhất trước)
+    for (let i = rows.length - 1; i >= 1 && videos.length < limit; i--) {
+      const row = rows[i];
+      if (!row[1]) continue; // Bỏ qua dòng rỗng
+      videos.push({
+        fileName:     row[0],
+        trackingCode: row[1],
+        uploadDate:   row[2] ? new Date(row[2]).toISOString() : null,
+        fileId:       row[4],
+        driveUrl:     row[5]
+      });
+    }
+    
+    return { ok: true, videos: videos };
+  } catch (err) {
+    return { error: "Lỗi lấy danh sách video: " + err.message };
+  }
+}
+
