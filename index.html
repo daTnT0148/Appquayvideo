@@ -298,10 +298,12 @@ document.getElementById("btnGoToCamera").addEventListener("click",()=>{
   if(appState==="home"){appState="gate";if(!mediaStream){document.getElementById("gateStart").classList.remove("hidden");}else{enterScanningState();}}
 });
 document.getElementById("btnBackHome").addEventListener("click",()=>{
+  if(appState==="recording") stopRecordingAndUpload();
   document.getElementById("viewCamera").classList.remove("active");
   document.getElementById("viewHome").classList.remove("hidden");
   if(appState==="scanning")scanningActive=false;
   if(scanInterval){clearInterval(scanInterval);scanInterval=null;}
+  if(drawRafId){cancelAnimationFrame(drawRafId); drawRafId=null;}
   appState="home";
   loadRecentVideos(); // Refresh list when returning home
 });
@@ -636,6 +638,8 @@ function enterScanningState(){
 }
 
 function startRecording(trackingCodeValue){
+  if (appState === "recording") return; // Ngăn ngừa gọi nhiều lần khi có nhiều kết quả quét cùng lúc
+  scanningActive = false;
   const finalCode=(trackingCodeValue||"").trim();
   if(!finalCode){const m=prompt("Nhập mã vận đơn:");if(!m||!m.trim())return;startRecording(m.trim());return;}
   currentTrackingCode=finalCode;
@@ -691,6 +695,7 @@ function stopRecordingAndUpload(){
   clearInterval(recTimerInterval);beep(2,600,0.2,0.1);releaseWakeLock();
 }
 function onRecorderStopped(){
+  if(drawRafId){cancelAnimationFrame(drawRafId); drawRafId=null;}
   recordedBlob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||"video/webm"});
   pendingUploadTrackingCode=currentTrackingCode;
   document.getElementById("recChip").classList.remove("show");
