@@ -5,7 +5,7 @@
  * - Bypass hoàn toàn mọi request tới script.google.com → luôn fetch thật
  */
 
-const CACHE_NAME = "video-proof-cache-v9";
+const CACHE_NAME = "video-proof-cache-v10";
 
 // Chỉ cache các tài nguyên local, bỏ CDN ngoài (CDN tự cache bởi browser)
 const APP_SHELL = [
@@ -74,7 +74,7 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => {
           if (event.request.mode === "navigate") {
-            return caches.match("/index.html");
+            return caches.match("./index.html");
           }
         });
     })

@@ -1,8 +1,8 @@
 {
   "name": "Video Bằng Chứng Đóng Gói",
   "short_name": "VBC",
-  "start_url": "/index.html",
-  "scope": "/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#0f0f0f",
   "theme_color": "#f5b942",
