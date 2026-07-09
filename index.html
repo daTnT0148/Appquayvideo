@@ -137,6 +137,26 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .btn-row .btn-action{flex:1;}
 .video-link-action{display:flex;align-items:center;justify-content:center;gap:8px;color:#a5a8ff;text-decoration:none;font-size:13px;font-weight:600;padding:6px;}
 .hidden{display:none!important;}
+
+/* SETTINGS */
+.btn-settings{width:40px;height:40px;border-radius:50%;background:var(--card);border:1px solid var(--border);color:var(--text-dim);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.btn-settings:active{background:var(--card2);}
+.settings-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);}
+.settings-overlay.show{display:flex;align-items:flex-end;justify-content:center;}
+.settings-sheet{width:100%;max-width:420px;background:#1a1a1a;border-radius:24px 24px 0 0;padding:0 0 max(20px,env(safe-area-inset-bottom));}
+.settings-handle{width:40px;height:4px;background:rgba(255,255,255,.2);border-radius:99px;margin:12px auto;}
+.settings-header{display:flex;align-items:center;justify-content:space-between;padding:4px 20px 16px;border-bottom:1px solid var(--border);}
+.settings-title{font-size:17px;font-weight:800;color:var(--text);}
+.btn-settings-close{background:none;border:none;color:var(--text-dim);font-size:24px;cursor:pointer;padding:4px;}
+.settings-body{padding:20px;display:flex;flex-direction:column;gap:20px;}
+.settings-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-dim);margin-bottom:8px;}
+.settings-options{display:flex;gap:8px;}
+.settings-opt{flex:1;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px 8px;text-align:center;font-size:14px;font-weight:700;color:var(--text-dim);cursor:pointer;}
+.settings-opt.active{border-color:var(--amber);color:var(--amber);background:rgba(245,185,66,.08);}
+.settings-opt-sub{font-size:11px;font-weight:500;margin-top:2px;opacity:.7;}
+.btn-settings-save{width:100%;background:var(--amber);color:#1a0e00;border:none;border-radius:16px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;margin-top:4px;}
+.btn-settings-save:active{opacity:.85;}
+.settings-note{font-size:12px;color:var(--text-dim);text-align:center;line-height:1.5;}
 </style>
 </head>
 <body>
@@ -150,8 +170,48 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
         <div class="home-logo-sub">Video Bằng Chứng Đóng Gói</div>
       </div>
     </div>
-    <button class="install-badge" id="btnInstall">📲 Cài đặt</button>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="install-badge" id="btnInstall">📲 Cài đặt</button>
+      <button class="btn-settings" id="btnOpenSettings">⚙️</button>
+    </div>
   </div>
+
+<!-- SETTINGS BOTTOM SHEET -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-sheet">
+    <div class="settings-handle"></div>
+    <div class="settings-header">
+      <div class="settings-title">⚙️ Cài đặt video</div>
+      <button class="btn-settings-close" id="btnCloseSettings">✕</button>
+    </div>
+    <div class="settings-body">
+      <div>
+        <div class="settings-group-label">📹 Chất lượng video</div>
+        <div class="settings-options">
+          <div class="settings-opt" data-setting="resolution" data-value="720">
+            720p<div class="settings-opt-sub">HD • Nhẹ máy</div>
+          </div>
+          <div class="settings-opt" data-setting="resolution" data-value="1080">
+            1080p<div class="settings-opt-sub">Full HD</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="settings-group-label">🎞️ Tốc độ khung hình</div>
+        <div class="settings-options">
+          <div class="settings-opt" data-setting="fps" data-value="30">
+            30 FPS<div class="settings-opt-sub">Tiết kiệm pin</div>
+          </div>
+          <div class="settings-opt" data-setting="fps" data-value="60">
+            60 FPS<div class="settings-opt-sub">Mượt hơn</div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-note" id="settingsNote"></div>
+      <button class="btn-settings-save" id="btnSaveSettings">💾 Lưu cài đặt</button>
+    </div>
+  </div>
+</div>
 
   <div class="search-bar-wrap">
     <div class="search-bar">
@@ -251,6 +311,78 @@ let deferredInstallPrompt=null;
 window.addEventListener("beforeinstallprompt",(e)=>{e.preventDefault();deferredInstallPrompt=e;document.getElementById("btnInstall").classList.add("show");});
 document.getElementById("btnInstall").addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;document.getElementById("btnInstall").classList.remove("show");});
 window.addEventListener("appinstalled",()=>document.getElementById("btnInstall").classList.remove("show"));
+
+// --- SETTINGS ---
+const DEFAULT_SETTINGS = { resolution: "720", fps: "30" };
+function loadSettings() {
+  try { const s = JSON.parse(localStorage.getItem("vbc_settings")); return s && s.resolution ? s : { ...DEFAULT_SETTINGS }; }
+  catch(e) { return { ...DEFAULT_SETTINGS }; }
+}
+function saveSettings(s) { localStorage.setItem("vbc_settings", JSON.stringify(s)); }
+function getResolutionConstraints(s) {
+  return s.resolution === "1080"
+    ? { width: { ideal: 1920 }, height: { ideal: 1080 } }
+    : { width: { ideal: 1280 }, height: { ideal: 720 } };
+}
+function getBitrate(s) {
+  if (s.resolution === "1080" && s.fps === "60") return 4000000;
+  if (s.resolution === "1080") return 2500000;
+  if (s.fps === "60") return 2000000;
+  return 1500000;
+}
+function getFps(s) { return parseInt(s.fps) || 30; }
+let currentSettings = loadSettings();
+
+// Settings UI
+(function initSettingsUI() {
+  const overlay = document.getElementById("settingsOverlay");
+  const noteEl = document.getElementById("settingsNote");
+  let tempSettings = { ...currentSettings };
+
+  function renderOpts() {
+    document.querySelectorAll(".settings-opt").forEach(el => {
+      const key = el.dataset.setting;
+      const val = el.dataset.value;
+      el.classList.toggle("active", tempSettings[key] === val);
+    });
+  }
+
+  document.querySelectorAll(".settings-opt").forEach(el => {
+    el.addEventListener("click", () => {
+      tempSettings[el.dataset.setting] = el.dataset.value;
+      renderOpts();
+    });
+  });
+
+  document.getElementById("btnOpenSettings").addEventListener("click", () => {
+    tempSettings = { ...currentSettings };
+    renderOpts();
+    noteEl.textContent = "";
+    overlay.classList.add("show");
+  });
+
+  document.getElementById("btnCloseSettings").addEventListener("click", () => overlay.classList.remove("show"));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("show"); });
+
+  document.getElementById("btnSaveSettings").addEventListener("click", () => {
+    const changed = currentSettings.resolution !== tempSettings.resolution || currentSettings.fps !== tempSettings.fps;
+    currentSettings = { ...tempSettings };
+    saveSettings(currentSettings);
+    if (changed && appState !== "home") {
+      noteEl.textContent = "⚠️ Cần dừng quay, quay lại trang chủ rồi mở camera lại để áp dụng.";
+      noteEl.style.color = "var(--amber)";
+      setTimeout(() => overlay.classList.remove("show"), 1800);
+    } else if (changed && mediaStream) {
+      noteEl.textContent = "✅ Đã lưu! Mở camera lại để áp dụng.";
+      noteEl.style.color = "var(--green)";
+      setTimeout(() => overlay.classList.remove("show"), 1200);
+    } else {
+      noteEl.textContent = "✅ Đã lưu!";
+      noteEl.style.color = "var(--green)";
+      setTimeout(() => overlay.classList.remove("show"), 800);
+    }
+  });
+})();
 
 // --- STATE & VARS ---
 let appState="home",mediaStream=null,currentTrack=null,zoomLevel=1,zoomMin=1,zoomMax=5,zoomStep=0.5;
@@ -466,7 +598,8 @@ async function initCamera(){
   document.getElementById("gateError").classList.add("hidden");
   document.getElementById("gateStart").classList.add("hidden");
   try{
-    mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}},audio:false});
+    const resCons = getResolutionConstraints(currentSettings);
+    mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",...resCons,frameRate:{ideal:getFps(currentSettings)}},audio:false});
   }catch(err){
     document.getElementById("gateErrorMsg").innerText=err.name==="NotAllowedError"?"Bạn đã từ chối quyền camera. Vào cài đặt trình duyệt để cấp lại quyền, rồi bấm Thử lại.":"Không tìm thấy camera phù hợp. ("+err.message+")";
     document.getElementById("gateStart").classList.add("hidden");
@@ -529,7 +662,8 @@ function startDrawLoop(){
     drawRafId=requestAnimationFrame(draw);
     if(appState!=="recording") return; 
     
-    if(now-lastDrawTime<33) return; // 30fps
+    const frameInterval = getFps(currentSettings) >= 60 ? 16 : 33;
+    if(now-lastDrawTime<frameInterval) return; // dynamic fps cap
     lastDrawTime=now;
 
     const vw=srcVideo.videoWidth, vh=srcVideo.videoHeight;
@@ -664,10 +798,12 @@ function startRecording(trackingCodeValue){
   startDrawLoop(); 
   
   recordedChunks=[];
-  const canvasStream=outputCanvas.captureStream(30);
+  const targetFps = getFps(currentSettings);
+  const canvasStream=outputCanvas.captureStream(targetFps);
   const mimes=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/mp4","video/webm"];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||"";
-  try{mediaRecorder=mime?new MediaRecorder(canvasStream,{mimeType:mime,videoBitsPerSecond:1500000}):new MediaRecorder(canvasStream);}
+  const bitrate = getBitrate(currentSettings);
+  try{mediaRecorder=mime?new MediaRecorder(canvasStream,{mimeType:mime,videoBitsPerSecond:bitrate}):new MediaRecorder(canvasStream);}
   catch(e){alert("Thiết bị không hỗ trợ quay video. Dùng Chrome trên Android.");enterScanningState();return;}
   
   mediaRecorder.ondataavailable=(e)=>{if(e.data&&e.data.size>0)recordedChunks.push(e.data);};
