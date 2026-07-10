@@ -141,6 +141,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .btn-action.green{background:var(--green);color:#06210f;}
 .btn-action.red{background:var(--red);color:#fff;}
 .btn-action.indigo{background:var(--indigo);color:#fff;}
+.btn-action.amber{background:var(--amber);color:#1a0e00;}
 .btn-action.outline{background:transparent;border:1.5px solid rgba(255,255,255,.3);color:#fff;}
 .btn-row{display:flex;gap:10px;}
 .btn-row .btn-action{flex:1;}
@@ -301,6 +302,7 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
       </div>
       <div class="action-title hidden" id="statusLine2"></div>
       <button class="btn-action red hidden" id="btnStopRecord">⏹ Dừng &amp; Lưu video</button>
+      <button class="btn-action amber hidden" id="btnSaveLocalManual">💾 Lưu video xuống máy</button>
       <div class="btn-row hidden" id="rowRetry">
         <button class="btn-action indigo" id="btnRetryUpload">🔁 Thử upload lại</button>
         <button class="btn-action outline" id="btnDiscard">🗑 Bỏ video</button>
@@ -869,7 +871,7 @@ function startRecording(trackingCodeValue){
   document.getElementById("actionOverlay").classList.add("show");
   document.getElementById("uploadGroup").style.display="none";
   document.getElementById("orientControls").style.display="none"; // Khóa nút đổi góc khi đang quay
-  showEl("statusLine2",false);showEl("btnStopRecord",true);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);
+  showEl("statusLine2",false);showEl("btnStopRecord",true);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);showEl("btnSaveLocalManual",false);
   
   beep(1,800,0.2);requestWakeLock();
   
@@ -918,42 +920,129 @@ function onRecorderStopped(){
   uploadVideoToDrive(recordedBlob,pendingUploadTrackingCode);
 }
 
-async function uploadVideoToDrive(blob,trackingCodeValue){
-  appState="uploading";
+/* =========================================================================
+ * BACKUP LƯU VIDEO XUỐNG MÁY (khi upload Drive thất bại/timeout)
+ * ========================================================================= */
+const UPLOAD_TIMEOUT_MS = 30000; // 30 giây
+let localSaveDone = false;
+
+// Tự lưu blob video xuống thư mục Downloads của máy (không cần server)
+function saveVideoLocally(blob, trackingCodeValue) {
+  try {
+    const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
+    const fileName = `donggoi_${sanitizeForFileName(trackingCodeValue || "unknown")}_${fileTimestamp(new Date())}.${ext}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    localSaveDone = true;
+    return true;
+  } catch (e) {
+    console.error("[SaveLocal] Lỗi:", e);
+    return false;
+  }
+}
+
+document.getElementById("btnSaveLocalManual").addEventListener("click", () => {
+  if (!recordedBlob) { alert("Không còn dữ liệu video trong bộ nhớ."); return; }
+  const ok = saveVideoLocally(recordedBlob, pendingUploadTrackingCode || currentTrackingCode);
+  alert(ok ? "Đã lưu video vào thư mục Downloads trên máy." : "Không lưu được video. Vui lòng thử lại.");
+});
+
+// Race giữa 1 lần thử upload với timeout 30s
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), ms))
+  ]);
+}
+
+// 1 lần thử upload thật sự (đọc base64 + gửi lên Apps Script) — không đổi UI, chỉ trả Promise
+async function doUploadAttempt(blob, trackingCodeValue) {
+  const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
+  const fileName = `${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
+
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(new Error("Không đọc được dữ liệu video."));
+    reader.readAsDataURL(blob);
+  });
+
+  const payload = JSON.stringify({
+    action: "uploadVideo",
+    key: CONFIG.SECRET_KEY,
+    data: { base64, mimeType: blob.type || "video/webm", fileName, trackingCode: trackingCodeValue, uploadDate: new Date().toISOString() }
+  });
+
+  const response = await fetch(CONFIG.APPS_SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: payload });
+  const text = await response.text();
+  let json;
+  try { json = JSON.parse(text); } catch (e) { throw new Error("Phản hồi không hợp lệ."); }
+  if (json.error) throw new Error(json.error);
+  return json;
+}
+
+async function uploadVideoToDrive(blob, trackingCodeValue) {
+  appState = "uploading";
+  localSaveDone = false;
   document.getElementById("actionOverlay").classList.add("show");
-  document.getElementById("scanReticle").style.display="none";
+  document.getElementById("scanReticle").style.display = "none";
   document.getElementById("scanHint").classList.add("hidden");
-  showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);
-  
-  const ug=document.getElementById("uploadGroup");ug.style.display="flex";
-  document.getElementById("statusLine").innerHTML=`⏫ Đang upload mã <strong>${trackingCodeValue}</strong>...`;
-  showEl("statusLine2",false);updateProgress(0);
-  
-  const ext=(blob.type||"video/webm").includes("mp4")?"mp4":"webm";
-  const fileName=`${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
-  let base64;
-  try{
-    base64=await new Promise((resolve,reject)=>{
-      const reader=new FileReader();
-      reader.onload=()=>resolve(reader.result.split(",")[1]);
-      reader.onerror=()=>reject(new Error("Không đọc được dữ liệu video."));
-      reader.readAsDataURL(blob);
-    });
-  }catch(e){enterErrorState(e.message);return;}
-  
-  const payload=JSON.stringify({action:"uploadVideo",key:CONFIG.SECRET_KEY,data:{base64,mimeType:blob.type||"video/webm",fileName,trackingCode:trackingCodeValue,uploadDate:new Date().toISOString()}});
-  let fakePct=0;
-  const fakeTimer=setInterval(()=>{fakePct=fakePct<70?fakePct+4:fakePct<90?fakePct+0.8:fakePct;updateProgress(Math.round(fakePct));},400);
-  try{
-    const response=await fetch(CONFIG.APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:payload});
-    clearInterval(fakeTimer);updateProgress(100);
-    const text=await response.text();
-    let json;try{json=JSON.parse(text);}catch(e){enterErrorState("Phản hồi không hợp lệ.");return;}
-    if(json.error){enterErrorState(json.error);return;}
+  showEl("btnStopRecord", false); showEl("rowRetry", false); showEl("videoResultLink", false); showEl("btnNewRecording", false);
+  showEl("btnSaveLocalManual", true); // Cho phép người dùng chủ động bấm lưu tay bất cứ lúc nào trong lúc chờ
+
+  const ug = document.getElementById("uploadGroup"); ug.style.display = "flex";
+  document.getElementById("statusLine").innerHTML = `⏫ Đang upload mã <strong>${trackingCodeValue}</strong>...`;
+  showEl("statusLine2", false); updateProgress(0);
+
+  let fakePct = 0;
+  let fakeTimer = setInterval(() => {
+    fakePct = fakePct < 70 ? fakePct + 4 : fakePct < 90 ? fakePct + 0.8 : fakePct;
+    updateProgress(Math.round(fakePct));
+  }, 400);
+
+  const tryOnce = () => withTimeout(doUploadAttempt(blob, trackingCodeValue), UPLOAD_TIMEOUT_MS);
+
+  // ── Lần thử 1 ──
+  try {
+    const json = await tryOnce();
+    clearInterval(fakeTimer); updateProgress(100);
     enterDoneState(json);
-  }catch(err){
+    return;
+  } catch (err1) {
+    console.warn("[Upload] Lần 1 thất bại:", err1.message);
+  }
+
+  // ── Retry đúng 1 lần trước khi lưu xuống máy ──
+  clearInterval(fakeTimer);
+  document.getElementById("statusLine").innerHTML = `🔁 Thử upload lại mã <strong>${trackingCodeValue}</strong>...`;
+  updateProgress(0);
+  fakePct = 0;
+  fakeTimer = setInterval(() => {
+    fakePct = fakePct < 70 ? fakePct + 4 : fakePct < 90 ? fakePct + 0.8 : fakePct;
+    updateProgress(Math.round(fakePct));
+  }, 400);
+
+  try {
+    const json = await tryOnce();
+    clearInterval(fakeTimer); updateProgress(100);
+    enterDoneState(json);
+    return;
+  } catch (err2) {
     clearInterval(fakeTimer);
-    enterErrorState(err.name==="TypeError"?"Lỗi kết nối. Kiểm tra Internet và Apps Script.":"Upload thất bại: "+err.message);
+    console.warn("[Upload] Lần 2 thất bại:", err2.message);
+
+    // Upload thất bại (hoặc timeout) cả 2 lần -> tự động lưu xuống máy
+    const saved = saveVideoLocally(blob, trackingCodeValue);
+    enterErrorState(
+      saved ? "Upload thất bại, đã lưu video vào bộ nhớ máy." : "Upload thất bại và không tự lưu được video. Bấm 'Lưu video xuống máy' để thử lại.",
+      { autoSaved: saved }
+    );
   }
 }
 
@@ -964,19 +1053,21 @@ function enterDoneState(uploadResult){
   document.getElementById("uploadGroup").style.display="none";
   showEl("statusLine2",true);
   document.getElementById("statusLine2").innerHTML=`✅ Đã lưu! Mã <strong>${pendingUploadTrackingCode}</strong><br><span style="font-size:12px;opacity:.7">Quét mã mới để quay tiếp</span>`;
-  showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("btnNewRecording",true);
+  showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("btnNewRecording",true);showEl("btnSaveLocalManual",false);
   if(uploadResult&&uploadResult.driveUrl){document.getElementById("videoResultLink").href=uploadResult.driveUrl;showEl("videoResultLink",true);}
-  recordedBlob=null;recordedChunks=[];
+  recordedBlob=null;recordedChunks=[];localSaveDone=false;
   
   enterScanningState();
 }
 
-function enterErrorState(message){
+function enterErrorState(message,opts){
+  opts=opts||{};
   appState="error";
   document.getElementById("uploadGroup").style.display="none";
   showEl("statusLine2",true);
-  document.getElementById("statusLine2").innerHTML=`⚠️ ${message||"Lỗi không xác định"}<br><span style="font-size:12px;opacity:.7">Video vẫn giữ trên máy</span>`;
-  showEl("btnStopRecord",false);showEl("rowRetry",true);showEl("btnNewRecording",false);
+  const subText=opts.autoSaved?"Video đã được lưu vào thư mục Downloads trên máy.":"Video vẫn giữ trong bộ nhớ — bấm nút bên dưới để lưu hoặc thử lại.";
+  document.getElementById("statusLine2").innerHTML=`⚠️ ${message||"Lỗi không xác định"}<br><span style="font-size:12px;opacity:.7">${subText}</span>`;
+  showEl("btnStopRecord",false);showEl("rowRetry",true);showEl("btnNewRecording",false);showEl("btnSaveLocalManual",true);
 }
 
 document.getElementById("btnRetryUpload").addEventListener("click",()=>{
@@ -984,10 +1075,10 @@ document.getElementById("btnRetryUpload").addEventListener("click",()=>{
   else{alert("Không còn dữ liệu video. Vui lòng quay lại từ đầu.");enterScanningState();}
 });
 document.getElementById("btnDiscard").addEventListener("click",()=>{
-  if(confirm("Bỏ video này? Không thể khôi phục.")){recordedBlob=null;recordedChunks=[];currentTrackingCode="";document.getElementById("actionOverlay").classList.remove("show");enterScanningState();}
+  if(confirm("Bỏ video này? Không thể khôi phục.")){recordedBlob=null;recordedChunks=[];currentTrackingCode="";localSaveDone=false;document.getElementById("actionOverlay").classList.remove("show");enterScanningState();}
 });
 document.getElementById("btnNewRecording").addEventListener("click",()=>{
-  currentTrackingCode="";recordedBlob=null;recordedChunks=[];
+  currentTrackingCode="";recordedBlob=null;recordedChunks=[];localSaveDone=false;
   document.getElementById("actionOverlay").classList.remove("show");
   enterScanningState();
 });
