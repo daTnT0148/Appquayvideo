@@ -120,6 +120,15 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .scan-hint.hidden{display:none;}
 .btn-manual{background:var(--amber);color:#1a0e00;border:none;border-radius:30px;padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;}
 
+.cam-lens-wrap{position:absolute;bottom:calc(max(24px,env(safe-area-inset-bottom)) + 54px);left:50%;transform:translateX(-50%);z-index:20;}
+.lens-selector{display:none;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:30px;padding:4px;gap:6px;}
+.lens-selector.show{display:flex;}
+.lens-btn{width:38px;height:38px;border-radius:50%;background:transparent;border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+.lens-btn.active{background:rgba(255,255,255,.2);color:var(--amber);}
+.flip-btn{display:none;position:absolute;bottom:max(24px,env(safe-area-inset-bottom));right:20px;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:none;color:#fff;font-size:20px;align-items:center;justify-content:center;cursor:pointer;z-index:20;}
+.flip-btn.show{display:flex;}
+.flip-btn:active{opacity:.7;}
+
 .action-overlay{display:none;position:absolute;inset:0;z-index:25;background:rgba(0,0,0,.8);flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(32px,env(safe-area-inset-bottom));}
 .action-overlay.show{display:flex;}
 .action-sheet{width:100%;max-width:420px;padding:0 20px;display:flex;flex-direction:column;gap:10px;}
@@ -185,12 +194,6 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
       <button class="btn-settings-close" id="btnCloseSettings">✕</button>
     </div>
     <div class="settings-body">
-      <div id="cameraSettingGroup" style="display:none;">
-        <div class="settings-group-label">📸 Chọn Camera</div>
-        <div class="settings-options" id="cameraOptionsList" style="flex-direction:column;">
-          <!-- Nơi chứa các nút chọn camera -->
-        </div>
-      </div>
       <div>
         <div class="settings-group-label">📹 Chất lượng video</div>
         <div class="settings-options">
@@ -279,16 +282,15 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
     <div class="zoom-label" id="orientLabel">Dọc</div>
   </div>
   
-  <div class="zoom-controls" id="zoomControls">
-    <button class="zoom-btn" id="btnZoomIn">＋</button>
-    <div class="zoom-label" id="zoomLabel">1×</div>
-    <button class="zoom-btn" id="btnZoomOut">－</button>
-  </div>
-  
   <div class="scan-hint" id="scanHint">
     <span>Đưa mã QR vào khung</span>
     <button class="btn-manual" id="btnManualRecord">Quay thủ công</button>
   </div>
+  
+  <div class="cam-lens-wrap">
+    <div class="lens-selector" id="lensSelector"></div>
+  </div>
+  <button class="flip-btn" id="btnFlipCamera">🔄</button>
   
   <div class="action-overlay" id="actionOverlay">
     <div class="action-sheet">
@@ -319,7 +321,7 @@ document.getElementById("btnInstall").addEventListener("click",async()=>{if(!def
 window.addEventListener("appinstalled",()=>document.getElementById("btnInstall").classList.remove("show"));
 
 // --- SETTINGS ---
-const DEFAULT_SETTINGS = { resolution: "720", fps: "30", cameraId: "" };
+const DEFAULT_SETTINGS = { resolution: "720", fps: "30" };
 function loadSettings() {
   try { const s = JSON.parse(localStorage.getItem("vbc_settings")); return s && s.resolution ? { ...DEFAULT_SETTINGS, ...s } : { ...DEFAULT_SETTINGS }; }
   catch(e) { return { ...DEFAULT_SETTINGS }; }
@@ -360,50 +362,9 @@ let currentSettings = loadSettings();
     });
   });
 
-  async function populateCameras() {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter(d => d.kind === 'videoinput');
-      const group = document.getElementById("cameraSettingGroup");
-      const list = document.getElementById("cameraOptionsList");
-      
-      if (videoInputs.length <= 1) {
-        group.style.display = "none";
-        return;
-      }
-      group.style.display = "block";
-      list.innerHTML = "";
-      
-      let activeDeviceId = tempSettings.cameraId;
-      if (!activeDeviceId && mediaStream && mediaStream.getVideoTracks().length > 0) {
-        activeDeviceId = mediaStream.getVideoTracks()[0].getSettings().deviceId;
-      }
-      
-      videoInputs.forEach((cam, idx) => {
-        let label = cam.label || `Camera ${idx + 1}`;
-        if (label.length > 35) label = label.substring(0, 32) + "...";
-        
-        const el = document.createElement("div");
-        el.className = "settings-opt";
-        if (activeDeviceId === cam.deviceId) el.classList.add("active");
-        el.dataset.setting = "cameraId";
-        el.dataset.value = cam.deviceId;
-        el.textContent = label;
-        
-        el.addEventListener("click", () => {
-           tempSettings.cameraId = cam.deviceId;
-           Array.from(list.children).forEach(child => child.classList.remove("active"));
-           el.classList.add("active");
-        });
-        list.appendChild(el);
-      });
-    } catch(e) {}
-  }
-
   document.getElementById("btnOpenSettings").addEventListener("click", () => {
     tempSettings = { ...currentSettings };
     renderOpts();
-    populateCameras();
     noteEl.textContent = "";
     overlay.classList.add("show");
   });
@@ -413,8 +374,7 @@ let currentSettings = loadSettings();
 
   document.getElementById("btnSaveSettings").addEventListener("click", () => {
     const changed = currentSettings.resolution !== tempSettings.resolution || 
-                    currentSettings.fps !== tempSettings.fps || 
-                    currentSettings.cameraId !== tempSettings.cameraId;
+                    currentSettings.fps !== tempSettings.fps;
     currentSettings = { ...tempSettings };
     saveSettings(currentSettings);
     
@@ -647,51 +607,92 @@ window.deleteFoundVideo = async function(code) {
 document.getElementById("btnSearch").addEventListener("click",doSearch);
 document.getElementById("searchCode").addEventListener("keypress",(e)=>{if(e.key==="Enter")doSearch();});
 
+let currentFacing = "environment";
+let currentLensIdx = 1; // Mặc định là cam 1x (index 1 nếu có 3 cam)
+
 // --- CAMERA INIT ---
 document.getElementById("btnEnableCamera").addEventListener("click",initCamera);
 document.getElementById("btnRetryCamera").addEventListener("click",initCamera);
 
+document.getElementById("btnFlipCamera").addEventListener("click", () => {
+  if (appState === "recording") { alert("Cần dừng quay rồi đổi camera."); return; }
+  currentFacing = currentFacing === "environment" ? "user" : "environment";
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  initCamera();
+});
+
 async function initCamera(){
   document.getElementById("gateError").classList.add("hidden");
   document.getElementById("gateStart").classList.add("hidden");
+  
+  const lensSelector = document.getElementById("lensSelector");
+  const flipBtn = document.getElementById("btnFlipCamera");
+  
   try{
-    const resCons = getResolutionConstraints(currentSettings);
-    let videoConstraints = { facingMode: "environment", ...resCons, frameRate: { ideal: getFps(currentSettings) } };
-    
-    // Camera Selection Logic
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoInputs = devices.filter(d => d.kind === 'videoinput');
     
-    let targetId = currentSettings.cameraId;
-    if (targetId && !videoInputs.find(d => d.deviceId === targetId)) {
-      targetId = ""; // Fallback nếu ID cũ không còn
-      currentSettings.cameraId = "";
-      saveSettings(currentSettings);
+    let backCams = videoInputs.filter(c => !c.label.toLowerCase().includes('front') && !c.label.toLowerCase().includes('trước'));
+    if (backCams.length === 0) backCams = videoInputs; // fallback
+    const frontCams = videoInputs.filter(c => c.label.toLowerCase().includes('front') || c.label.toLowerCase().includes('trước'));
+    
+    flipBtn.classList.toggle("show", frontCams.length > 0 && backCams.length > 0);
+    
+    let targetId = null;
+    if (currentFacing === "environment") {
+      if (currentLensIdx >= backCams.length) currentLensIdx = backCams.length > 1 ? 1 : 0;
+      targetId = backCams[currentLensIdx]?.deviceId;
+    } else {
+      targetId = frontCams[0]?.deviceId;
     }
-    if (!targetId && videoInputs.length > 0) {
-      const backCam = videoInputs.find(d => (d.label||"").toLowerCase().includes("back"));
-      if (backCam) targetId = backCam.deviceId;
-    }
+    
+    const resCons = getResolutionConstraints(currentSettings);
+    let videoConstraints = { ...resCons, frameRate: { ideal: getFps(currentSettings) } };
     
     if (targetId) {
       videoConstraints.deviceId = { exact: targetId };
-      delete videoConstraints.facingMode;
+    } else {
+      videoConstraints.facingMode = currentFacing;
     }
     
     try {
       mediaStream=await navigator.mediaDevices.getUserMedia({video: videoConstraints, audio:false});
     } catch(err) {
       if (videoConstraints.deviceId) {
-        // Fallback to auto if explicit deviceId fails
-        currentSettings.cameraId = "";
-        saveSettings(currentSettings);
-        videoConstraints.facingMode = "environment";
-        delete videoConstraints.deviceId;
-        mediaStream=await navigator.mediaDevices.getUserMedia({video: videoConstraints, audio:false});
+        // Fallback 1: Drop resolution/fps constraints, just ask for deviceId
+        try {
+          mediaStream=await navigator.mediaDevices.getUserMedia({video: { deviceId: { exact: targetId } }, audio:false});
+        } catch(e) {
+          // Fallback 2: Drop deviceId, fallback to facingMode
+          mediaStream=await navigator.mediaDevices.getUserMedia({video: { facingMode: currentFacing }, audio:false});
+        }
       } else {
         throw err;
       }
     }
+    
+    // Render Lens Selector UI
+    if (currentFacing === "environment" && backCams.length > 1) {
+      lensSelector.classList.add("show");
+      lensSelector.innerHTML = "";
+      const labels = backCams.length === 3 ? [".5", "1x", "3"] : backCams.map((_, i) => `${i+1}x`);
+      backCams.forEach((cam, i) => {
+        const btn = document.createElement("button");
+        btn.className = `lens-btn ${i === currentLensIdx ? 'active' : ''}`;
+        btn.textContent = labels[i] || `${i+1}x`;
+        btn.onclick = () => {
+          if (currentLensIdx === i) return;
+          if (appState === "recording") { alert("Cần dừng quay để đổi ống kính."); return; }
+          currentLensIdx = i;
+          if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+          initCamera();
+        };
+        lensSelector.appendChild(btn);
+      });
+    } else {
+      lensSelector.classList.remove("show");
+    }
+    
   }catch(err){
     document.getElementById("gateErrorMsg").innerText=err.name==="NotAllowedError"?"Bạn đã từ chối quyền camera. Vào cài đặt trình duyệt để cấp lại quyền, rồi bấm Thử lại.":"Không tìm thấy camera phù hợp. ("+err.message+")";
     document.getElementById("gateStart").classList.add("hidden");
@@ -703,27 +704,12 @@ async function initCamera(){
   await new Promise(resolve=>{if(srcVideo.videoWidth>0)return resolve();srcVideo.onloadedmetadata=()=>resolve();});
   currentTrack=mediaStream.getVideoTracks()[0];
   
-  initZoom();
   autoDetectOrientation();
   document.getElementById("orientControls").style.display="flex";
   resizeCanvas();
   initBarcodeScanner();
   enterScanningState();
 }
-
-function initZoom(){
-  if(!currentTrack)return;
-  const caps=currentTrack.getCapabilities?currentTrack.getCapabilities():{};
-  if(caps.zoom){zoomMin=caps.zoom.min||1;zoomMax=caps.zoom.max||5;zoomStep=caps.zoom.step||0.5;zoomLevel=Math.max(zoomMin,1);document.getElementById("zoomControls").style.display="flex";updateZoomUI();}
-}
-async function applyZoom(level){
-  if(!currentTrack||!currentTrack.applyConstraints)return;
-  try{await currentTrack.applyConstraints({advanced:[{zoom:level}]});zoomLevel=level;updateZoomUI();}
-  catch(e){document.getElementById("zoomControls").style.display="none";}
-}
-function updateZoomUI(){document.getElementById("zoomLabel").textContent=zoomLevel%1===0?zoomLevel+"×":zoomLevel.toFixed(1)+"×";}
-document.getElementById("btnZoomIn").addEventListener("click",()=>{applyZoom(Math.min(zoomMax,parseFloat((zoomLevel+zoomStep).toFixed(1))));});
-document.getElementById("btnZoomOut").addEventListener("click",()=>{applyZoom(Math.max(zoomMin,parseFloat((zoomLevel-zoomStep).toFixed(1))));});
 
 function resizeCanvas(){
   let vw=srcVideo.videoWidth||1280;
