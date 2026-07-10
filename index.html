@@ -185,6 +185,12 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
       <button class="btn-settings-close" id="btnCloseSettings">✕</button>
     </div>
     <div class="settings-body">
+      <div id="cameraSettingGroup" style="display:none;">
+        <div class="settings-group-label">📸 Chọn Camera</div>
+        <div class="settings-options" id="cameraOptionsList" style="flex-direction:column;">
+          <!-- Nơi chứa các nút chọn camera -->
+        </div>
+      </div>
       <div>
         <div class="settings-group-label">📹 Chất lượng video</div>
         <div class="settings-options">
@@ -313,9 +319,9 @@ document.getElementById("btnInstall").addEventListener("click",async()=>{if(!def
 window.addEventListener("appinstalled",()=>document.getElementById("btnInstall").classList.remove("show"));
 
 // --- SETTINGS ---
-const DEFAULT_SETTINGS = { resolution: "720", fps: "30" };
+const DEFAULT_SETTINGS = { resolution: "720", fps: "30", cameraId: "" };
 function loadSettings() {
-  try { const s = JSON.parse(localStorage.getItem("vbc_settings")); return s && s.resolution ? s : { ...DEFAULT_SETTINGS }; }
+  try { const s = JSON.parse(localStorage.getItem("vbc_settings")); return s && s.resolution ? { ...DEFAULT_SETTINGS, ...s } : { ...DEFAULT_SETTINGS }; }
   catch(e) { return { ...DEFAULT_SETTINGS }; }
 }
 function saveSettings(s) { localStorage.setItem("vbc_settings", JSON.stringify(s)); }
@@ -354,9 +360,50 @@ let currentSettings = loadSettings();
     });
   });
 
+  async function populateCameras() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      const group = document.getElementById("cameraSettingGroup");
+      const list = document.getElementById("cameraOptionsList");
+      
+      if (videoInputs.length <= 1) {
+        group.style.display = "none";
+        return;
+      }
+      group.style.display = "block";
+      list.innerHTML = "";
+      
+      let activeDeviceId = tempSettings.cameraId;
+      if (!activeDeviceId && mediaStream && mediaStream.getVideoTracks().length > 0) {
+        activeDeviceId = mediaStream.getVideoTracks()[0].getSettings().deviceId;
+      }
+      
+      videoInputs.forEach((cam, idx) => {
+        let label = cam.label || `Camera ${idx + 1}`;
+        if (label.length > 35) label = label.substring(0, 32) + "...";
+        
+        const el = document.createElement("div");
+        el.className = "settings-opt";
+        if (activeDeviceId === cam.deviceId) el.classList.add("active");
+        el.dataset.setting = "cameraId";
+        el.dataset.value = cam.deviceId;
+        el.textContent = label;
+        
+        el.addEventListener("click", () => {
+           tempSettings.cameraId = cam.deviceId;
+           Array.from(list.children).forEach(child => child.classList.remove("active"));
+           el.classList.add("active");
+        });
+        list.appendChild(el);
+      });
+    } catch(e) {}
+  }
+
   document.getElementById("btnOpenSettings").addEventListener("click", () => {
     tempSettings = { ...currentSettings };
     renderOpts();
+    populateCameras();
     noteEl.textContent = "";
     overlay.classList.add("show");
   });
@@ -365,19 +412,29 @@ let currentSettings = loadSettings();
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("show"); });
 
   document.getElementById("btnSaveSettings").addEventListener("click", () => {
-    const changed = currentSettings.resolution !== tempSettings.resolution || currentSettings.fps !== tempSettings.fps;
+    const changed = currentSettings.resolution !== tempSettings.resolution || 
+                    currentSettings.fps !== tempSettings.fps || 
+                    currentSettings.cameraId !== tempSettings.cameraId;
     currentSettings = { ...tempSettings };
     saveSettings(currentSettings);
-    if (changed && appState !== "home") {
-      noteEl.textContent = "⚠️ Cần dừng quay, quay lại trang chủ rồi mở camera lại để áp dụng.";
+    
+    if (changed && appState === "recording") {
+      noteEl.textContent = "⚠️ Cần dừng quay rồi mở lại để áp dụng cài đặt mới.";
       noteEl.style.color = "var(--amber)";
       setTimeout(() => overlay.classList.remove("show"), 1800);
-    } else if (changed && mediaStream) {
-      noteEl.textContent = "✅ Đã lưu! Mở camera lại để áp dụng.";
+    } else if (changed && appState === "scanning") {
+      noteEl.textContent = "✅ Đang khởi động lại camera...";
       noteEl.style.color = "var(--green)";
-      setTimeout(() => overlay.classList.remove("show"), 1200);
+      setTimeout(() => {
+        overlay.classList.remove("show");
+        if(mediaStream){
+          mediaStream.getTracks().forEach(t => t.stop());
+          mediaStream = null;
+        }
+        initCamera();
+      }, 800);
     } else {
-      noteEl.textContent = "✅ Đã lưu!";
+      noteEl.textContent = "✅ Đã lưu cài đặt!";
       noteEl.style.color = "var(--green)";
       setTimeout(() => overlay.classList.remove("show"), 800);
     }
@@ -599,7 +656,42 @@ async function initCamera(){
   document.getElementById("gateStart").classList.add("hidden");
   try{
     const resCons = getResolutionConstraints(currentSettings);
-    mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",...resCons,frameRate:{ideal:getFps(currentSettings)}},audio:false});
+    let videoConstraints = { facingMode: "environment", ...resCons, frameRate: { ideal: getFps(currentSettings) } };
+    
+    // Camera Selection Logic
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+    
+    let targetId = currentSettings.cameraId;
+    if (targetId && !videoInputs.find(d => d.deviceId === targetId)) {
+      targetId = ""; // Fallback nếu ID cũ không còn
+      currentSettings.cameraId = "";
+      saveSettings(currentSettings);
+    }
+    if (!targetId && videoInputs.length > 0) {
+      const backCam = videoInputs.find(d => (d.label||"").toLowerCase().includes("back"));
+      if (backCam) targetId = backCam.deviceId;
+    }
+    
+    if (targetId) {
+      videoConstraints.deviceId = { exact: targetId };
+      delete videoConstraints.facingMode;
+    }
+    
+    try {
+      mediaStream=await navigator.mediaDevices.getUserMedia({video: videoConstraints, audio:false});
+    } catch(err) {
+      if (videoConstraints.deviceId) {
+        // Fallback to auto if explicit deviceId fails
+        currentSettings.cameraId = "";
+        saveSettings(currentSettings);
+        videoConstraints.facingMode = "environment";
+        delete videoConstraints.deviceId;
+        mediaStream=await navigator.mediaDevices.getUserMedia({video: videoConstraints, audio:false});
+      } else {
+        throw err;
+      }
+    }
   }catch(err){
     document.getElementById("gateErrorMsg").innerText=err.name==="NotAllowedError"?"Bạn đã từ chối quyền camera. Vào cài đặt trình duyệt để cấp lại quyền, rồi bấm Thử lại.":"Không tìm thấy camera phù hợp. ("+err.message+")";
     document.getElementById("gateStart").classList.add("hidden");
