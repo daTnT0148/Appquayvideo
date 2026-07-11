@@ -923,7 +923,6 @@ function onRecorderStopped(){
 /* =========================================================================
  * BACKUP LƯU VIDEO XUỐNG MÁY (khi upload Drive thất bại/timeout)
  * ========================================================================= */
-const UPLOAD_TIMEOUT_MS = 30000; // 30 giây
 let localSaveDone = false;
 
 // Tự lưu blob video xuống thư mục Downloads của máy (không cần server)
@@ -953,7 +952,14 @@ document.getElementById("btnSaveLocalManual").addEventListener("click", () => {
   alert(ok ? "Đã lưu video vào thư mục Downloads trên máy." : "Không lưu được video. Vui lòng thử lại.");
 });
 
-// Race giữa 1 lần thử upload với timeout 30s
+// Kích thước mỗi chunk: 5MB — video dài chia nhỏ để upload ổn định trên mạng yếu
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const CHUNK_TIMEOUT_MS = 45000; // Timeout riêng cho MỖI chunk (không phải cả video)
+const CHUNK_MAX_RETRIES = 3;
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+// Race giữa 1 request với timeout — dùng cho từng chunk
 function withTimeout(promise, ms) {
   return Promise.race([
     promise,
@@ -961,22 +967,29 @@ function withTimeout(promise, ms) {
   ]);
 }
 
-// 1 lần thử upload thật sự (đọc base64 + gửi lên Apps Script) — không đổi UI, chỉ trả Promise
-async function doUploadAttempt(blob, trackingCodeValue) {
-  const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
-  const fileName = `${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
-
+// Gửi 1 chunk lên Apps Script (đọc base64 của riêng chunk đó, không phải cả video)
+async function sendChunk(chunkBlob, meta) {
   const base64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = () => reject(new Error("Không đọc được dữ liệu video."));
-    reader.readAsDataURL(blob);
+    reader.onerror = () => reject(new Error("Không đọc được dữ liệu chunk."));
+    reader.readAsDataURL(chunkBlob);
   });
 
   const payload = JSON.stringify({
-    action: "uploadVideo",
+    action: "uploadVideoChunk",
     key: CONFIG.SECRET_KEY,
-    data: { base64, mimeType: blob.type || "video/webm", fileName, trackingCode: trackingCodeValue, uploadDate: new Date().toISOString() }
+    data: {
+      sessionId: meta.sessionId,
+      chunkIndex: meta.chunkIndex,
+      totalChunks: meta.totalChunks,
+      base64,
+      mimeType: meta.mimeType,
+      fileName: meta.fileName,
+      trackingCode: meta.trackingCode,
+      uploadDate: meta.uploadDate,
+      isLastChunk: meta.isLastChunk
+    }
   });
 
   const response = await fetch(CONFIG.APPS_SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: payload });
@@ -987,6 +1000,22 @@ async function doUploadAttempt(blob, trackingCodeValue) {
   return json;
 }
 
+// Gửi 1 chunk, tự retry tối đa CHUNK_MAX_RETRIES lần trước khi báo lỗi hẳn
+async function uploadChunkWithRetry(chunkBlob, meta) {
+  let lastErr;
+  for (let attempt = 1; attempt <= CHUNK_MAX_RETRIES; attempt++) {
+    try {
+      return await withTimeout(sendChunk(chunkBlob, meta), CHUNK_TIMEOUT_MS);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[Chunk ${meta.chunkIndex + 1}/${meta.totalChunks}] Lỗi lần ${attempt}:`, err.message);
+      if (attempt < CHUNK_MAX_RETRIES) await sleep(800 * attempt); // Backoff nhẹ giữa các lần retry
+    }
+  }
+  throw new Error(`Chunk ${meta.chunkIndex + 1}/${meta.totalChunks} thất bại sau ${CHUNK_MAX_RETRIES} lần thử.`);
+}
+
+// ── Upload chính: chia blob thành các chunk 5MB, gửi tuần tự, ghép lại thành 1 file trên Drive ──
 async function uploadVideoToDrive(blob, trackingCodeValue) {
   appState = "uploading";
   localSaveDone = false;
@@ -997,47 +1026,48 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
   showEl("btnSaveLocalManual", true); // Cho phép người dùng chủ động bấm lưu tay bất cứ lúc nào trong lúc chờ
 
   const ug = document.getElementById("uploadGroup"); ug.style.display = "flex";
-  document.getElementById("statusLine").innerHTML = `⏫ Đang upload mã <strong>${trackingCodeValue}</strong>...`;
+  document.getElementById("statusLine").innerHTML = `📦 Đang chuẩn bị upload mã <strong>${trackingCodeValue}</strong>...`;
   showEl("statusLine2", false); updateProgress(0);
 
-  let fakePct = 0;
-  let fakeTimer = setInterval(() => {
-    fakePct = fakePct < 70 ? fakePct + 4 : fakePct < 90 ? fakePct + 0.8 : fakePct;
-    updateProgress(Math.round(fakePct));
-  }, 400);
+  requestWakeLock(); // Giữ màn hình sáng suốt quá trình upload (có thể mất vài phút với video dài)
 
-  const tryOnce = () => withTimeout(doUploadAttempt(blob, trackingCodeValue), UPLOAD_TIMEOUT_MS);
+  const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
+  const fileName = `${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
+  const uploadDateIso = new Date().toISOString();
+  const mimeType = blob.type || "video/webm";
+  // sessionId mới mỗi lần gọi (kể cả khi bấm "Thử upload lại") để không lẫn với chunk của lần thử trước
+  const sessionId = "s" + Date.now() + Math.random().toString(36).slice(2, 8);
 
-  // ── Lần thử 1 ──
-  try {
-    const json = await tryOnce();
-    clearInterval(fakeTimer); updateProgress(100);
-    enterDoneState(json);
-    return;
-  } catch (err1) {
-    console.warn("[Upload] Lần 1 thất bại:", err1.message);
-  }
-
-  // ── Retry đúng 1 lần trước khi lưu xuống máy ──
-  clearInterval(fakeTimer);
-  document.getElementById("statusLine").innerHTML = `🔁 Thử upload lại mã <strong>${trackingCodeValue}</strong>...`;
-  updateProgress(0);
-  fakePct = 0;
-  fakeTimer = setInterval(() => {
-    fakePct = fakePct < 70 ? fakePct + 4 : fakePct < 90 ? fakePct + 0.8 : fakePct;
-    updateProgress(Math.round(fakePct));
-  }, 400);
+  const totalChunks = Math.max(1, Math.ceil(blob.size / CHUNK_SIZE));
 
   try {
-    const json = await tryOnce();
-    clearInterval(fakeTimer); updateProgress(100);
-    enterDoneState(json);
-    return;
-  } catch (err2) {
-    clearInterval(fakeTimer);
-    console.warn("[Upload] Lần 2 thất bại:", err2.message);
+    let finalResult = null;
 
-    // Upload thất bại (hoặc timeout) cả 2 lần -> tự động lưu xuống máy
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, blob.size);
+      const chunkBlob = blob.slice(start, end);
+      const isLast = (i === totalChunks - 1);
+
+      const res = await uploadChunkWithRetry(chunkBlob, {
+        sessionId, chunkIndex: i, totalChunks, fileName, mimeType,
+        trackingCode: trackingCodeValue, uploadDate: uploadDateIso, isLastChunk: isLast
+      });
+
+      const pct = Math.round(((i + 1) / totalChunks) * 100);
+      updateProgress(pct);
+      document.getElementById("statusLine").innerHTML = `⏫ Đang upload: <strong>${pct}%</strong> (${i + 1}/${totalChunks} phần)`;
+
+      if (isLast) finalResult = res;
+    }
+
+    releaseWakeLock();
+    enterDoneState(finalResult);
+
+  } catch (err) {
+    releaseWakeLock();
+    console.warn("[Upload] Thất bại sau khi retry hết:", err.message);
+    document.getElementById("statusLine").innerHTML = `⚠️ Upload thất bại, đang lưu vào bộ nhớ máy...`;
     const saved = saveVideoLocally(blob, trackingCodeValue);
     enterErrorState(
       saved ? "Upload thất bại, đã lưu video vào bộ nhớ máy." : "Upload thất bại và không tự lưu được video. Bấm 'Lưu video xuống máy' để thử lại.",

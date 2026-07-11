@@ -16,6 +16,7 @@ const SECRET_KEY  = "Kntvntd482001!"; // ← Đổi thành chuỗi bí mật ri�
 const VIDEO_FOLDER_NAME   = "VideoProof_PackingEvidence";
 const VIDEO_LOG_SHEET     = "VideoLog";
 const VIDEO_RETENTION_DAYS = 20;
+const TEMP_CHUNK_FOLDER_NAME = "VideoProof_TempChunks"; // Nơi tạm giữ từng chunk trước khi ghép
 
 // ─── Lấy (hoặc tạo mới) Spreadsheet dùng làm log ───
 function getSpreadsheet() {
@@ -66,6 +67,7 @@ function doPost(e) {
   try {
     switch (action) {
       case "uploadVideo":   result = uploadVideo(body.data);  break;
+      case "uploadVideoChunk": result = uploadVideoChunk(body.data); break;
       case "cleanupVideos": result = cleanupOldVideos();      break;
       case "searchVideo":   result = searchVideo(body.data);  break;
       case "deleteVideo":   result = deleteVideo(body.data);  break;
@@ -145,6 +147,93 @@ function uploadVideo(data) {
   }
 }
 
+// ─── Chunked upload: temp folder để giữ từng phần nhỏ trước khi ghép ───
+function getOrCreateTempChunkFolder() {
+  const folders = DriveApp.getFoldersByName(TEMP_CHUNK_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(TEMP_CHUNK_FOLDER_NAME);
+}
+
+function pad5(n) { return String(n).padStart(5, "0"); }
+
+/**
+ * Action "uploadVideoChunk" — nhận từng chunk (~5MB) của 1 video dài, lưu tạm trên Drive.
+ * Khi nhận được chunk cuối cùng (isLastChunk === true), tự động ghép toàn bộ các chunk
+ * theo đúng thứ tự thành 1 file video DUY NHẤT, lưu vào folder chính, ghi log, rồi xoá
+ * các file chunk tạm.
+ *
+ * data: { sessionId, chunkIndex, totalChunks, base64, mimeType, fileName,
+ *         trackingCode, uploadDate, isLastChunk }
+ */
+function uploadVideoChunk(data) {
+  if (!data || !data.base64 || !data.sessionId) {
+    return { error: "Thiếu dữ liệu chunk (base64, sessionId)" };
+  }
+
+  try {
+    const tempFolder = getOrCreateTempChunkFolder();
+    const decoded    = Utilities.base64Decode(data.base64);
+    const chunkName  = data.sessionId + "_" + pad5(data.chunkIndex);
+    const chunkBlob  = Utilities.newBlob(decoded, "application/octet-stream", chunkName);
+    tempFolder.createFile(chunkBlob);
+
+    // Chưa phải chunk cuối -> chỉ xác nhận đã nhận, chưa ghép
+    if (!data.isLastChunk) {
+      return { ok: true, chunkIndex: data.chunkIndex };
+    }
+
+    // ── Chunk cuối cùng: gom toàn bộ chunk của session này lại và ghép ──
+    const filesIter  = tempFolder.getFiles();
+    const chunkFiles = [];
+    while (filesIter.hasNext()) {
+      const f = filesIter.next();
+      if (f.getName().indexOf(data.sessionId + "_") === 0) chunkFiles.push(f);
+    }
+    chunkFiles.sort((a, b) => a.getName().localeCompare(b.getName())); // Tên có pad số 0 nên sort chuỗi = đúng thứ tự
+
+    if (chunkFiles.length === 0) {
+      return { error: "Không tìm thấy chunk nào để ghép (session: " + data.sessionId + ")" };
+    }
+
+    // Ghép byte theo đúng thứ tự — dùng mảng cấp phát sẵn kích thước để tránh concat lặp lại (chậm/tốn bộ nhớ)
+    let totalLen = 0;
+    const byteArrays = chunkFiles.map(f => {
+      const bytes = f.getBlob().getBytes();
+      totalLen += bytes.length;
+      return bytes;
+    });
+    const merged = new Array(totalLen);
+    let offset = 0;
+    byteArrays.forEach(bytes => {
+      for (let i = 0; i < bytes.length; i++) merged[offset + i] = bytes[i];
+      offset += bytes.length;
+    });
+
+    const mimeType  = data.mimeType || "video/webm";
+    const finalBlob = Utilities.newBlob(merged, mimeType, data.fileName);
+
+    const folder = getOrCreateVideoFolder();
+    const file   = folder.createFile(finalBlob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const fileId   = file.getId();
+    const driveUrl = "https://drive.google.com/file/d/" + fileId + "/view";
+
+    const uploadDate = data.uploadDate ? new Date(data.uploadDate) : new Date();
+    const deleteDate = new Date(uploadDate.getTime() + VIDEO_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+    const logSheet = ensureVideoLogSheet();
+    logSheet.appendRow([data.fileName, data.trackingCode || "", uploadDate, deleteDate, fileId, driveUrl]);
+
+    // Dọn sạch các file chunk tạm sau khi đã ghép xong thành công
+    chunkFiles.forEach(f => { try { f.setTrashed(true); } catch (e) {} });
+
+    return { ok: true, fileId: fileId, driveUrl: driveUrl, fileName: data.fileName };
+  } catch (err) {
+    return { error: "Ghép/lưu video thất bại: " + err.message };
+  }
+}
+
 /**
  * Action "searchVideo" — tìm kiếm video theo mã vận đơn
  * data: { trackingCode }
@@ -208,7 +297,27 @@ function cleanupOldVideos() {
     }
   }
 
-  return { ok: true, deletedCount: deletedCount };
+  return { ok: true, deletedCount: deletedCount, orphanedChunksRemoved: cleanupOrphanedChunks() };
+}
+
+// Xoá các file chunk tạm bị bỏ dở (session upload thất bại hẳn, không ghép được) sau 24h
+function cleanupOrphanedChunks() {
+  try {
+    const tempFolder = getOrCreateTempChunkFolder();
+    const files  = tempFolder.getFiles();
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    let removed = 0;
+    while (files.hasNext()) {
+      const f = files.next();
+      if (f.getLastUpdated() < cutoff) {
+        f.setTrashed(true);
+        removed++;
+      }
+    }
+    return removed;
+  } catch (e) {
+    return 0;
+  }
 }
 
 // ─── Chạy hàm này 1 LẦN DUY NHẤT (thủ công trong Apps Script editor) để cài lịch tự động ───
