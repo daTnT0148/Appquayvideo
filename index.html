@@ -823,10 +823,14 @@ function processScanFrame(){
   if(!foundCode && codeReader){
     try{
       codeReader.decodeFromCanvas(_scanCanvas).then(result=>{
-        if(result) handleDecodedCode(result.getText());
+        if(result && scanningActive){
+          scanningActive=false; // Chặn ngay lập tức để tránh cả 2 thư viện cùng trigger
+          handleDecodedCode(result.getText());
+        }
       }).catch(e=>{});
     }catch(e){}
   }else if(foundCode){
+    scanningActive=false; // Chặn ngay lập tức để tránh cả 2 thư viện cùng trigger
     handleDecodedCode(foundCode);
   }
 }
@@ -1016,7 +1020,12 @@ async function uploadChunkWithRetry(chunkBlob, meta) {
 }
 
 // ── Upload chính: chia blob thành các chunk 5MB, gửi tuần tự, ghép lại thành 1 file trên Drive ──
+let isUploading = false;
+
 async function uploadVideoToDrive(blob, trackingCodeValue) {
+  if (isUploading) return; // Chặn gọi upload 2 lần cùng lúc
+  isUploading = true;
+
   appState = "uploading";
   localSaveDone = false;
   document.getElementById("actionOverlay").classList.add("show");
@@ -1073,6 +1082,8 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
       saved ? "Upload thất bại, đã lưu video vào bộ nhớ máy." : "Upload thất bại và không tự lưu được video. Bấm 'Lưu video xuống máy' để thử lại.",
       { autoSaved: saved }
     );
+  } finally {
+    isUploading = false; // Luôn mở khoá lại dù thành công hay thất bại
   }
 }
 
@@ -1082,12 +1093,11 @@ function enterDoneState(uploadResult){
   appState="done";
   document.getElementById("uploadGroup").style.display="none";
   showEl("statusLine2",true);
-  document.getElementById("statusLine2").innerHTML=`✅ Đã lưu! Mã <strong>${pendingUploadTrackingCode}</strong><br><span style="font-size:12px;opacity:.7">Quét mã mới để quay tiếp</span>`;
+  document.getElementById("statusLine2").innerHTML=`✅ Đã lưu! Mã <strong>${pendingUploadTrackingCode}</strong><br><span style="font-size:12px;opacity:.7">Bấm "Quay video khác" để tiếp tục</span>`;
   showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("btnNewRecording",true);showEl("btnSaveLocalManual",false);
   if(uploadResult&&uploadResult.driveUrl){document.getElementById("videoResultLink").href=uploadResult.driveUrl;showEl("videoResultLink",true);}
   recordedBlob=null;recordedChunks=[];localSaveDone=false;
-  
-  enterScanningState();
+  // Không tự động enterScanningState() nữa — chỉ reset khi người dùng chủ động bấm "Quay video khác"
 }
 
 function enterErrorState(message,opts){
