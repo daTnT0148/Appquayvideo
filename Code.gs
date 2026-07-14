@@ -3,7 +3,8 @@
 // ============================================================
 const SECRET_KEY      = "Kntvntd482001!";          // Phải khớp với SECRET_KEY trong index.html
 const DRIVE_FOLDER_ID = "1DHIBw5JG34-PaAb12AI_khZeZ50zqjsN";      // ID thư mục Drive để lưu video
-const SPREADSHEET_ID  = ""; // ĐIỀN ID GOOGLE SHEET VÀO ĐÂY NẾU BẠN DÙNG SCRIPT ĐỘC LẬP (Lấy từ URL của file Sheet)
+const SPREADSHEET_ID  = "1uM5PemCsuBM2XNbRr9ME4aSC3nqwP5Fsutogsw6KcKI"; // ĐIỀN ID GOOGLE SHEET VÀO ĐÂY NẾU BẠN DÙNG SCRIPT ĐỘC LẬP (Lấy từ URL của file Sheet)
+const SHEET_NAME      = ""; // ĐIỀN TÊN TRANG TÍNH CHỨA VIDEO (Vd: "Trang tính 1" hoặc để trống để tự động lấy sheet đầu tiên)
 //   Cách lấy: Mở thư mục Drive → URL trình duyệt sẽ có dạng
 //   https://drive.google.com/drive/folders/1AbCdEfGhIj...
 //   Lấy đoạn sau /folders/ là DRIVE_FOLDER_ID
@@ -243,6 +244,11 @@ function getSheet() {
   
   if (!ss) {
     throw new Error("Không thể kết nối với Google Sheet. Vui lòng điền SPREADSHEET_ID ở đầu file Code.gs.");
+  }
+  
+  if (SHEET_NAME && SHEET_NAME.trim() !== "") {
+    var sheet = ss.getSheetByName(SHEET_NAME.trim());
+    if (sheet) return sheet;
   }
   
   // Đọc sheet theo tên "Data" hoặc "Trang tính1", nếu không có thì lấy sheet đầu tiên
