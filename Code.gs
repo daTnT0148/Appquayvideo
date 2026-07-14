@@ -3,6 +3,7 @@
 // ============================================================
 const SECRET_KEY      = "Kntvntd482001!";          // Phải khớp với SECRET_KEY trong index.html
 const DRIVE_FOLDER_ID = "1DHIBw5JG34-PaAb12AI_khZeZ50zqjsN";      // ID thư mục Drive để lưu video
+const SPREADSHEET_ID  = ""; // ĐIỀN ID GOOGLE SHEET VÀO ĐÂY NẾU BẠN DÙNG SCRIPT ĐỘC LẬP (Lấy từ URL của file Sheet)
 //   Cách lấy: Mở thư mục Drive → URL trình duyệt sẽ có dạng
 //   https://drive.google.com/drive/folders/1AbCdEfGhIj...
 //   Lấy đoạn sau /folders/ là DRIVE_FOLDER_ID
@@ -233,8 +234,18 @@ function handleDeleteVideo(trackingCode) {
 // Helper
 // ============================================================
 function getSheet() { 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = null;
+  if (SPREADSHEET_ID && SPREADSHEET_ID.trim() !== "") {
+    ss = SpreadsheetApp.openById(SPREADSHEET_ID.trim());
+  } else {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  }
+  
+  if (!ss) {
+    throw new Error("Không thể kết nối với Google Sheet. Vui lòng điền SPREADSHEET_ID ở đầu file Code.gs.");
+  }
+  
   // Đọc sheet theo tên "Data" hoặc "Trang tính1", nếu không có thì lấy sheet đầu tiên
-  return ss.getSheetByName("Data") || ss.getSheetByName("Trang tính1") || ss.getSheetByName("Sheet1") || ss.getSheets()[0]; 
+  return ss.getSheetByName("Data") || ss.getSheetByName("Trang tính1") || ss.getSheetByName("Sheet1") || ss.getSheetByName("Trang tính 1") || ss.getSheets()[0]; 
 }
 function json(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }

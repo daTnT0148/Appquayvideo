@@ -847,7 +847,7 @@ function processScanFrame(){
 }
 
 function handleDecodedCode(text){
-  if(appState!=="scanning"||!scanningActive)return;
+  if(appState!=="scanning")return;
   startRecording(text);
 }
 
@@ -1180,6 +1180,6 @@ document.getElementById("btnNewRecording").addEventListener("click",()=>{
   enterScanningState();
 });
 </script>
-<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v15072026-3</span></div>
+<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v15072026-4</span></div>
 </body>
 </html>

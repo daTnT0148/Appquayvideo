@@ -5,7 +5,7 @@
  * - Bypass hoàn toàn mọi request tới script.google.com → luôn fetch thật
  */
 
-const CACHE_NAME = "video-proof-cache-15072026-3";
+const CACHE_NAME = "video-proof-cache-15072026-4";
 
 // Chỉ cache các tài nguyên local, bỏ CDN ngoài (CDN tự cache bởi browser)
 const APP_SHELL = [
