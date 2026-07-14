@@ -800,8 +800,11 @@ function initBarcodeScanner(){
   codeReader=new ZXing.BrowserMultiFormatReader(hints);
 }
 
+let isScanProcessing = false;
+
 function processScanFrame(){
-  if(appState!=="scanning"||!scanningActive||srcVideo.readyState<2||srcVideo.videoWidth===0) return;
+  if(appState!=="scanning"||!scanningActive||srcVideo.readyState<2||srcVideo.videoWidth===0||isScanProcessing) return;
+  isScanProcessing = true;
   
   const w=srcVideo.videoWidth, h=srcVideo.videoHeight;
   const cw=Math.floor(w*0.5), ch=Math.floor(h*0.5);
@@ -823,15 +826,23 @@ function processScanFrame(){
   if(!foundCode && codeReader){
     try{
       codeReader.decodeFromCanvas(_scanCanvas).then(result=>{
+        isScanProcessing = false; // Mở khoá khi decode xong
         if(result && scanningActive){
-          scanningActive=false; // Chặn ngay lập tức để tránh cả 2 thư viện cùng trigger
+          scanningActive=false; // Chặn ngay lập tức
           handleDecodedCode(result.getText());
         }
-      }).catch(e=>{});
-    }catch(e){}
-  }else if(foundCode){
-    scanningActive=false; // Chặn ngay lập tức để tránh cả 2 thư viện cùng trigger
-    handleDecodedCode(foundCode);
+      }).catch(e=>{
+        isScanProcessing = false; // Mở khoá khi lỗi
+      });
+    }catch(e){
+      isScanProcessing = false; // Mở khoá khi lỗi sync
+    }
+  }else{
+    isScanProcessing = false; // Mở khoá nếu jsQR tìm thấy hoặc không có codeReader
+    if(foundCode){
+      scanningActive=false; // Chặn ngay lập tức
+      handleDecodedCode(foundCode);
+    }
   }
 }
 

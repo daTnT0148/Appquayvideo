@@ -177,18 +177,22 @@ function handleGetRecentVideos(data) {
     var values = sheet.getDataRange().getValues();
     var limit  = data.limit || 5;
     
-    // Bỏ qua dòng tiêu đề, lật ngược mảng để lấy mới nhất trước
-    var dataRows = values.slice(1).reverse();
     var recent = [];
-    
-    for (var i = 0; i < Math.min(limit, dataRows.length); i++) {
-      recent.push({
-        trackingCode: dataRows[i][0],
-        fileName:     dataRows[i][1],
-        driveUrl:     dataRows[i][2],
-        uploadDate:   dataRows[i][3]
-      });
+    // Đọc từ dưới lên, bắt đầu từ dòng cuối cùng của DataRange, bỏ qua dòng 1 (tiêu đề)
+    for (var i = values.length - 1; i >= 1; i--) {
+      var row = values[i];
+      // Chỉ lấy các dòng có mã vận đơn (không bị rỗng)
+      if (String(row[0]).trim() !== "") {
+        recent.push({
+          trackingCode: row[0],
+          fileName:     row[1],
+          driveUrl:     row[2],
+          uploadDate:   row[3]
+        });
+        if (recent.length >= limit) break;
+      }
     }
+    
     return json({ ok: true, videos: recent });
   } catch(err) {
     return json({ ok: false, error: err.toString() });
@@ -228,5 +232,9 @@ function handleDeleteVideo(trackingCode) {
 // ============================================================
 // Helper
 // ============================================================
-function getSheet() { return SpreadsheetApp.getActiveSpreadsheet().getSheets()[0]; }
+function getSheet() { 
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Đọc sheet theo tên "Data" hoặc "Trang tính1", nếu không có thì lấy sheet đầu tiên
+  return ss.getSheetByName("Data") || ss.getSheetByName("Trang tính1") || ss.getSheetByName("Sheet1") || ss.getSheets()[0]; 
+}
 function json(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
