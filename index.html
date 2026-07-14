@@ -925,29 +925,21 @@ function onRecorderStopped(){
 }
 
 /* =========================================================================
- * BACKUP LƯU VIDEO XUỐNG MÁY (khi upload Drive thất bại/timeout)
+ * BACKUP LƯU VIDEO XUỐNG MÁY (khi upload Drive thất bại)
  * ========================================================================= */
 let localSaveDone = false;
 
-// Tự lưu blob video xuống thư mục Downloads của máy (không cần server)
 function saveVideoLocally(blob, trackingCodeValue) {
   try {
     const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
     const fileName = `donggoi_${sanitizeForFileName(trackingCodeValue || "unknown")}_${fileTimestamp(new Date())}.${ext}`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    localSaveDone = true;
-    return true;
-  } catch (e) {
-    console.error("[SaveLocal] Lỗi:", e);
-    return false;
-  }
+    localSaveDone = true; return true;
+  } catch (e) { console.error("[SaveLocal]", e); return false; }
 }
 
 document.getElementById("btnSaveLocalManual").addEventListener("click", () => {
@@ -956,14 +948,22 @@ document.getElementById("btnSaveLocalManual").addEventListener("click", () => {
   alert(ok ? "Đã lưu video vào thư mục Downloads trên máy." : "Không lưu được video. Vui lòng thử lại.");
 });
 
-// Kích thước mỗi chunk: 5MB — video dài chia nhỏ để upload ổn định trên mạng yếu
-const CHUNK_SIZE = 5 * 1024 * 1024;
-const CHUNK_TIMEOUT_MS = 45000; // Timeout riêng cho MỖI chunk (không phải cả video)
+/* =========================================================================
+ * DRIVE RESUMABLE UPLOAD — Chunked Upload via Apps Script Proxy
+ * =========================================================================
+ * Luồng:
+ *  1. Gọi Apps Script action="getUploadUrl"  → nhận uploadUrl (Drive session)
+ *  2. Băm video thành các chunk nhỏ (ví dụ 3MB), chuyển thành base64.
+ *  3. Gửi từng chunk + uploadUrl lên Apps Script (action="uploadVideoChunk")
+ *  4. Apps Script decode base64 và PUT lên uploadUrl.
+ *  5. Gọi Apps Script action="logVideo" sau khi gửi hết các chunk.
+ * ========================================================================= */
+
+const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB mỗi chunk
+const CHUNK_TIMEOUT_MS = 30000; // 30s timeout cho mỗi chunk
 const CHUNK_MAX_RETRIES = 3;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-// Race giữa 1 request với timeout — dùng cho từng chunk
 function withTimeout(promise, ms) {
   return Promise.race([
     promise,
@@ -971,8 +971,26 @@ function withTimeout(promise, ms) {
   ]);
 }
 
-// Gửi 1 chunk lên Apps Script (đọc base64 của riêng chunk đó, không phải cả video)
-async function sendChunk(chunkBlob, meta) {
+// Bước 1: Xin Apps Script mở phiên Resumable Upload
+async function getUploadUrl(fileName, mimeType, trackingCode, fileSize) {
+  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({
+      action: "getUploadUrl",
+      key: CONFIG.SECRET_KEY,
+      data: { fileName, mimeType, trackingCode, fileSize }
+    })
+  });
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch(e) { throw new Error("Apps Script trả về dữ liệu không hợp lệ."); }
+  if (!json.ok || !json.uploadUrl) throw new Error(json.error || "Không lấy được upload URL.");
+  return json.uploadUrl;
+}
+
+// Bước 2: Gửi 1 chunk (base64) lên Apps Script để forward sang Drive
+async function sendChunkToProxy(chunkBlob, meta) {
   const base64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result.split(",")[1]);
@@ -984,15 +1002,13 @@ async function sendChunk(chunkBlob, meta) {
     action: "uploadVideoChunk",
     key: CONFIG.SECRET_KEY,
     data: {
-      sessionId: meta.sessionId,
+      uploadUrl: meta.uploadUrl,
       chunkIndex: meta.chunkIndex,
       totalChunks: meta.totalChunks,
-      base64,
-      mimeType: meta.mimeType,
-      fileName: meta.fileName,
-      trackingCode: meta.trackingCode,
-      uploadDate: meta.uploadDate,
-      isLastChunk: meta.isLastChunk
+      base64: base64,
+      startByte: meta.startByte,
+      chunkSize: chunkBlob.size,
+      totalSize: meta.totalSize
     }
   });
 
@@ -1004,26 +1020,47 @@ async function sendChunk(chunkBlob, meta) {
   return json;
 }
 
-// Gửi 1 chunk, tự retry tối đa CHUNK_MAX_RETRIES lần trước khi báo lỗi hẳn
+// Tự retry chunk nếu lỗi mạng
 async function uploadChunkWithRetry(chunkBlob, meta) {
   let lastErr;
   for (let attempt = 1; attempt <= CHUNK_MAX_RETRIES; attempt++) {
     try {
-      return await withTimeout(sendChunk(chunkBlob, meta), CHUNK_TIMEOUT_MS);
+      return await withTimeout(sendChunkToProxy(chunkBlob, meta), CHUNK_TIMEOUT_MS);
     } catch (err) {
       lastErr = err;
       console.warn(`[Chunk ${meta.chunkIndex + 1}/${meta.totalChunks}] Lỗi lần ${attempt}:`, err.message);
-      if (attempt < CHUNK_MAX_RETRIES) await sleep(800 * attempt); // Backoff nhẹ giữa các lần retry
+      if (attempt < CHUNK_MAX_RETRIES) await sleep(800 * attempt);
     }
   }
   throw new Error(`Chunk ${meta.chunkIndex + 1}/${meta.totalChunks} thất bại sau ${CHUNK_MAX_RETRIES} lần thử.`);
 }
 
-// ── Upload chính: chia blob thành các chunk 5MB, gửi tuần tự, ghép lại thành 1 file trên Drive ──
+// Bước 3: Ghi log vào Sheet
+async function logVideoToSheet(trackingCode, fileName, driveFileId, uploadDateIso) {
+  const driveUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
+  try {
+    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action: "logVideo",
+        key: CONFIG.SECRET_KEY,
+        data: { trackingCode, fileName, driveUrl, uploadDate: uploadDateIso }
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    return { ...json, driveUrl };
+  } catch(e) {
+    console.warn("[logVideo] Lỗi ghi log:", e.message);
+    return { ok: false, driveUrl };
+  }
+}
+
+// ── Hàm upload chính ─────────────────────────────────────────────────────────
 let isUploading = false;
 
 async function uploadVideoToDrive(blob, trackingCodeValue) {
-  if (isUploading) return; // Chặn gọi upload 2 lần cùng lúc
+  if (isUploading) return;
   isUploading = true;
 
   appState = "uploading";
@@ -1031,51 +1068,61 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
   document.getElementById("actionOverlay").classList.add("show");
   document.getElementById("scanReticle").style.display = "none";
   document.getElementById("scanHint").classList.add("hidden");
-  showEl("btnStopRecord", false); showEl("rowRetry", false); showEl("videoResultLink", false); showEl("btnNewRecording", false);
-  showEl("btnSaveLocalManual", true); // Cho phép người dùng chủ động bấm lưu tay bất cứ lúc nào trong lúc chờ
+  showEl("btnStopRecord", false); showEl("rowRetry", false); showEl("videoResultLink", false);
+  showEl("btnNewRecording", false); showEl("btnSaveLocalManual", true);
 
   const ug = document.getElementById("uploadGroup"); ug.style.display = "flex";
-  document.getElementById("statusLine").innerHTML = `📦 Đang chuẩn bị upload mã <strong>${trackingCodeValue}</strong>...`;
   showEl("statusLine2", false); updateProgress(0);
+  document.getElementById("statusLine").innerHTML = `📦 Đang kết nối Drive cho mã <strong>${trackingCodeValue}</strong>...`;
 
-  requestWakeLock(); // Giữ màn hình sáng suốt quá trình upload (có thể mất vài phút với video dài)
+  requestWakeLock();
 
   const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
+  const mimeType = blob.type || "video/webm";
   const fileName = `${sanitizeForFileName(trackingCodeValue)}_${fileTimestamp(new Date())}.${ext}`;
   const uploadDateIso = new Date().toISOString();
-  const mimeType = blob.type || "video/webm";
-  // sessionId mới mỗi lần gọi (kể cả khi bấm "Thử upload lại") để không lẫn với chunk của lần thử trước
-  const sessionId = "s" + Date.now() + Math.random().toString(36).slice(2, 8);
-
-  const totalChunks = Math.max(1, Math.ceil(blob.size / CHUNK_SIZE));
+  const totalSize = blob.size;
+  const totalChunks = Math.max(1, Math.ceil(totalSize / CHUNK_SIZE));
 
   try {
+    // 1. Lấy URL phiên upload
+    document.getElementById("statusLine").innerHTML = `🔗 Đang mở phiên upload...`;
+    const uploadUrl = await getUploadUrl(fileName, mimeType, trackingCodeValue, totalSize);
+
+    // 2. Chia nhỏ blob và gửi qua Apps Script
+    let driveFileId = null;
     let finalResult = null;
 
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, blob.size);
+      const end = Math.min(start + CHUNK_SIZE, totalSize);
       const chunkBlob = blob.slice(start, end);
-      const isLast = (i === totalChunks - 1);
 
       const res = await uploadChunkWithRetry(chunkBlob, {
-        sessionId, chunkIndex: i, totalChunks, fileName, mimeType,
-        trackingCode: trackingCodeValue, uploadDate: uploadDateIso, isLastChunk: isLast
+        uploadUrl, chunkIndex: i, totalChunks, startByte: start, totalSize: totalSize
       });
 
       const pct = Math.round(((i + 1) / totalChunks) * 100);
       updateProgress(pct);
       document.getElementById("statusLine").innerHTML = `⏫ Đang upload: <strong>${pct}%</strong> (${i + 1}/${totalChunks} phần)`;
 
-      if (isLast) finalResult = res;
+      if (i === totalChunks - 1) {
+        finalResult = res;
+        driveFileId = res.fileId;
+      }
     }
 
+    // 3. Ghi log
+    document.getElementById("statusLine").innerHTML = `✅ Hoàn tất! Đang ghi nhật ký...`;
+    const logResult = await logVideoToSheet(trackingCodeValue, fileName, driveFileId, uploadDateIso);
+    const driveUrl = logResult.driveUrl || (driveFileId ? `https://drive.google.com/file/d/${driveFileId}/view` : null);
+
     releaseWakeLock();
-    enterDoneState(finalResult);
+    enterDoneState({ driveUrl });
 
   } catch (err) {
     releaseWakeLock();
-    console.warn("[Upload] Thất bại sau khi retry hết:", err.message);
+    console.warn("[Upload] Thất bại:", err.message);
     document.getElementById("statusLine").innerHTML = `⚠️ Upload thất bại, đang lưu vào bộ nhớ máy...`;
     const saved = saveVideoLocally(blob, trackingCodeValue);
     enterErrorState(
@@ -1083,7 +1130,7 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
       { autoSaved: saved }
     );
   } finally {
-    isUploading = false; // Luôn mở khoá lại dù thành công hay thất bại
+    isUploading = false;
   }
 }
 
@@ -1097,7 +1144,6 @@ function enterDoneState(uploadResult){
   showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("btnNewRecording",true);showEl("btnSaveLocalManual",false);
   if(uploadResult&&uploadResult.driveUrl){document.getElementById("videoResultLink").href=uploadResult.driveUrl;showEl("videoResultLink",true);}
   recordedBlob=null;recordedChunks=[];localSaveDone=false;
-  // Không tự động enterScanningState() nữa — chỉ reset khi người dùng chủ động bấm "Quay video khác"
 }
 
 function enterErrorState(message,opts){
