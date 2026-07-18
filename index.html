@@ -358,6 +358,13 @@ function formatDateDisplay(dateVal) {
     d = new Date(year, month, day, hour, min, sec);
     if (!isNaN(d.getTime())) return d.toLocaleString("vi-VN", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
   }
+  const m2 = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?[, ]+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m2) {
+    const hour = parseInt(m2[1], 10), min = parseInt(m2[2], 10), sec = m2[3] ? parseInt(m2[3], 10) : 0;
+    const day = parseInt(m2[4], 10), month = parseInt(m2[5], 10) - 1, year = parseInt(m2[6], 10);
+    d = new Date(year, month, day, hour, min, sec);
+    if (!isNaN(d.getTime())) return d.toLocaleString("vi-VN", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  }
   return s;
 }
 
@@ -1243,6 +1250,6 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
 
 
 </script>
-<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v19072026-3</span></div>
+<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v19072026-4</span></div>
 </body>
 </html>

@@ -335,6 +335,19 @@ function serializeDate(val) {
     if (!isNaN(parsed.getTime())) return parsed.toISOString();
   }
   
+  // Thử parse dạng HH:mm:ss DD/MM/YYYY (do data.uploadDate cũ có lúc lưu kiểu này)
+  var m2 = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?[, ]+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m2) {
+    var hour  = parseInt(m2[1], 10);
+    var min   = parseInt(m2[2], 10);
+    var sec   = m2[3] ? parseInt(m2[3], 10) : 0;
+    var day   = parseInt(m2[4], 10);
+    var month = parseInt(m2[5], 10) - 1;
+    var year  = parseInt(m2[6], 10);
+    var parsed = new Date(year, month, day, hour, min, sec);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  
   // Không parse được, trả về null để frontend hiển thị "Không rõ"
   return null;
 }
