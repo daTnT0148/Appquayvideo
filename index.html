@@ -148,6 +148,24 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .video-link-action{display:flex;align-items:center;justify-content:center;gap:8px;color:#a5a8ff;text-decoration:none;font-size:13px;font-weight:600;padding:6px;}
 .hidden{display:none!important;}
 
+/* UPLOAD TOAST */
+#uploadToast{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(100px);z-index:9999;width:calc(100% - 32px);max-width:400px;background:#1e1e1e;border:1px solid var(--border);border-radius:20px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,.6);transition:transform .35s cubic-bezier(.25,.8,.25,1),opacity .3s;opacity:0;pointer-events:none;}
+#uploadToast.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto;}
+.toast-row{display:flex;align-items:center;gap:12px;}
+.toast-icon{font-size:20px;flex-shrink:0;}
+.toast-body{flex:1;min-width:0;}
+.toast-title{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.toast-sub{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.toast-actions{display:flex;gap:8px;margin-top:10px;}
+.toast-btn{flex:1;border:none;border-radius:12px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;}
+.toast-btn.indigo{background:var(--indigo);color:#fff;}
+.toast-btn.outline{background:transparent;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.8);}
+.toast-btn.green{background:var(--green);color:#06210f;}
+.toast-btn.red{background:var(--red);color:#fff;}
+.toast-progress-wrap{height:4px;background:rgba(255,255,255,.12);border-radius:99px;overflow:hidden;margin-top:10px;}
+.toast-progress-bar{height:100%;width:0%;background:var(--indigo);border-radius:99px;transition:width .3s ease;}
+.toast-spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--indigo);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;}
+
 /* SETTINGS */
 .btn-settings{width:40px;height:40px;border-radius:50%;background:var(--card);border:1px solid var(--border);color:var(--text-dim);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 .btn-settings:active{background:var(--card2);}
@@ -293,24 +311,28 @@ body{display:flex;flex-direction:column;height:100vh;height:100dvh;}
   </div>
   <button class="flip-btn" id="btnFlipCamera">🔄</button>
   
+  <!-- Stop record button — shown only while recording -->
   <div class="action-overlay" id="actionOverlay">
     <div class="action-sheet">
-      <div id="uploadGroup" style="display:none;flex-direction:column;gap:8px;">
-        <div class="action-title" id="statusLine">Đang upload...</div>
-        <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
-        <div class="progress-text" id="progressText">0%</div>
-      </div>
-      <div class="action-title hidden" id="statusLine2"></div>
       <button class="btn-action red hidden" id="btnStopRecord">⏹ Dừng &amp; Lưu video</button>
-      <button class="btn-action amber hidden" id="btnSaveLocalManual">💾 Lưu video xuống máy</button>
-      <div class="btn-row hidden" id="rowRetry">
-        <button class="btn-action indigo" id="btnRetryUpload">🔁 Thử upload lại</button>
-        <button class="btn-action outline" id="btnDiscard">🗑 Bỏ video</button>
-      </div>
-      <a href="#" target="_blank" class="video-link-action hidden" id="videoResultLink">🔗 Xem video vừa lưu trên Drive</a>
-      <button class="btn-action green hidden" id="btnNewRecording">🎬 Quay video khác</button>
     </div>
   </div>
+</div>
+
+<!-- UPLOAD TOAST (global, outside viewCamera) -->
+<div id="uploadToast">
+  <div class="toast-row">
+    <div class="toast-spinner" id="toastSpinner"></div>
+    <div class="toast-body">
+      <div class="toast-title" id="toastTitle">Đang upload...</div>
+      <div class="toast-sub" id="toastSub"></div>
+    </div>
+    <button style="background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0;" id="toastClose">✕</button>
+  </div>
+  <div class="toast-progress-wrap" id="toastProgressWrap">
+    <div class="toast-progress-bar" id="toastProgressBar"></div>
+  </div>
+  <div class="toast-actions" id="toastActions" style="display:none;"></div>
 </div>
 
 <script>
@@ -884,9 +906,8 @@ function startRecording(trackingCodeValue){
   document.getElementById("recChip").classList.add("show");
   document.getElementById("scanHint").classList.add("hidden");
   document.getElementById("actionOverlay").classList.add("show");
-  document.getElementById("uploadGroup").style.display="none";
-  document.getElementById("orientControls").style.display="none"; // Khóa nút đổi góc khi đang quay
-  showEl("statusLine2",false);showEl("btnStopRecord",true);showEl("rowRetry",false);showEl("videoResultLink",false);showEl("btnNewRecording",false);showEl("btnSaveLocalManual",false);
+  document.getElementById("orientControls").style.display="none";
+  showEl("btnStopRecord",true);
   
   beep(1,800,0.2);requestWakeLock();
   
@@ -930,8 +951,8 @@ function onRecorderStopped(){
   recordedBlob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||"video/webm"});
   pendingUploadTrackingCode=currentTrackingCode;
   document.getElementById("recChip").classList.remove("show");
-  outputCanvas.style.display="none";
-  srcVideo.style.display="block";
+  // Quay về trạng thái scan ngay lập tức — upload chạy ngầm
+  enterScanningState();
   uploadVideoToDrive(recordedBlob,pendingUploadTrackingCode);
 }
 
@@ -953,7 +974,10 @@ function saveVideoLocally(blob, trackingCodeValue) {
   } catch (e) { console.error("[SaveLocal]", e); return false; }
 }
 
-document.getElementById("btnSaveLocalManual").addEventListener("click", () => {
+// pendingBlob: giữ blob khi upload lỗi để retry từ toast
+let pendingBlob = null;
+
+document.getElementById("btnSaveLocalManual") && document.getElementById("btnSaveLocalManual").addEventListener("click", () => {
   if (!recordedBlob) { alert("Không còn dữ liệu video trong bộ nhớ."); return; }
   const ok = saveVideoLocally(recordedBlob, pendingUploadTrackingCode || currentTrackingCode);
   alert(ok ? "Đã lưu video vào thư mục Downloads trên máy." : "Không lưu được video. Vui lòng thử lại.");
@@ -1067,26 +1091,66 @@ async function logVideoToSheet(trackingCode, fileName, driveFileId, uploadDateIs
   }
 }
 
+// ── Toast Upload Notification ─────────────────────────────────────────────────
+let _toastTimer = null;
+
+function showToast({ icon = "⏫", title, sub = "", progress = -1, actions = [] }) {
+  const toast = document.getElementById("uploadToast");
+  const spinner = document.getElementById("toastSpinner");
+  const iconIsSpinner = (icon === "spinner");
+  spinner.style.display = iconIsSpinner ? "block" : "none";
+
+  const iconEl = toast.querySelector(".toast-icon");
+  if (!iconEl && !iconIsSpinner) {
+    // create icon element if not spinner
+  }
+  document.getElementById("toastTitle").textContent = title;
+  document.getElementById("toastSub").textContent = sub;
+
+  const pw = document.getElementById("toastProgressWrap");
+  const pb = document.getElementById("toastProgressBar");
+  if (progress >= 0) {
+    pw.style.display = "block";
+    pb.style.width = progress + "%";
+    pb.style.background = progress === 100 ? "var(--green)" : "var(--indigo)";
+  } else {
+    pw.style.display = "none";
+  }
+
+  const actionsEl = document.getElementById("toastActions");
+  if (actions.length > 0) {
+    actionsEl.style.display = "flex";
+    actionsEl.innerHTML = actions.map(a =>
+      `<button class="toast-btn ${a.cls||'outline'}" onclick="${a.fn}">${a.label}</button>`
+    ).join("");
+  } else {
+    actionsEl.style.display = "none";
+  }
+
+  toast.classList.add("show");
+  if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+}
+
+function hideToast(delay = 0) {
+  if (delay > 0) {
+    _toastTimer = setTimeout(() => document.getElementById("uploadToast").classList.remove("show"), delay);
+  } else {
+    document.getElementById("uploadToast").classList.remove("show");
+  }
+}
+
+document.getElementById("toastClose").addEventListener("click", () => hideToast());
+
 // ── Hàm upload chính ─────────────────────────────────────────────────────────
 let isUploading = false;
 
 async function uploadVideoToDrive(blob, trackingCodeValue) {
   if (isUploading) return;
   isUploading = true;
-
-  appState = "uploading";
   localSaveDone = false;
-  document.getElementById("actionOverlay").classList.add("show");
-  document.getElementById("scanReticle").style.display = "none";
-  document.getElementById("scanHint").classList.add("hidden");
-  showEl("btnStopRecord", false); showEl("rowRetry", false); showEl("videoResultLink", false);
-  showEl("btnNewRecording", false); showEl("btnSaveLocalManual", true);
-
-  const ug = document.getElementById("uploadGroup"); ug.style.display = "flex";
-  showEl("statusLine2", false); updateProgress(0);
-  document.getElementById("statusLine").innerHTML = `📦 Đang kết nối Drive cho mã <strong>${trackingCodeValue}</strong>...`;
-
   requestWakeLock();
+
+  showToast({ icon:"spinner", title:`Đang upload: ${trackingCodeValue}`, sub:"Đang kết nối Drive...", progress:0 });
 
   const ext = (blob.type || "video/webm").includes("mp4") ? "mp4" : "webm";
   const mimeType = blob.type || "video/webm";
@@ -1097,12 +1161,11 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
 
   try {
     // 1. Lấy URL phiên upload
-    document.getElementById("statusLine").innerHTML = `🔗 Đang mở phiên upload...`;
+    showToast({ icon:"spinner", title:`Đang upload: ${trackingCodeValue}`, sub:"Đang mở phiên...", progress:0 });
     const uploadUrl = await getUploadUrl(fileName, mimeType, trackingCodeValue, totalSize);
 
     // 2. Chia nhỏ blob và gửi qua Apps Script
     let driveFileId = null;
-    let finalResult = null;
 
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE;
@@ -1114,72 +1177,55 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
       });
 
       const pct = Math.round(((i + 1) / totalChunks) * 100);
-      updateProgress(pct);
-      document.getElementById("statusLine").innerHTML = `⏫ Đang upload: <strong>${pct}%</strong> (${i + 1}/${totalChunks} phần)`;
+      showToast({ icon:"spinner", title:`Đang upload: ${trackingCodeValue}`, sub:`${pct}% — phần ${i+1}/${totalChunks}`, progress:pct });
 
-      if (i === totalChunks - 1) {
-        finalResult = res;
-        driveFileId = res.fileId;
-      }
+      if (i === totalChunks - 1) driveFileId = res.fileId;
     }
 
     // 3. Ghi log
-    document.getElementById("statusLine").innerHTML = `✅ Hoàn tất! Đang ghi nhật ký...`;
+    showToast({ icon:"spinner", title:`Đang upload: ${trackingCodeValue}`, sub:"Đang ghi nhật ký...", progress:100 });
     const logResult = await logVideoToSheet(trackingCodeValue, fileName, driveFileId, uploadDateIso);
     const driveUrl = logResult.driveUrl || (driveFileId ? `https://drive.google.com/file/d/${driveFileId}/view` : null);
 
     releaseWakeLock();
-    enterDoneState({ driveUrl });
+    recordedBlob = null; recordedChunks = []; localSaveDone = false;
+    loadRecentVideos(); // Refresh danh sách video
+
+    // Hiện toast thành công với nút xem Drive
+    const doneActions = driveUrl
+      ? [{ label:"🔗 Xem trên Drive", cls:"indigo", fn:`window.open('${driveUrl}','_blank');hideToast();` }]
+      : [];
+    showToast({ icon:"✅", title:`✅ Đã lưu: ${trackingCodeValue}`, sub:"Upload thành công!", progress:100, actions:doneActions });
+    document.getElementById("toastSpinner").style.display = "none";
+    hideToast(6000); // Tự đóng sau 6 giây
+    beep(1, 1000, 0.15);
 
   } catch (err) {
     releaseWakeLock();
     console.warn("[Upload] Thất bại:", err.message);
-    document.getElementById("statusLine").innerHTML = `⚠️ Upload thất bại, đang lưu vào bộ nhớ máy...`;
     const saved = saveVideoLocally(blob, trackingCodeValue);
-    enterErrorState(
-      saved ? "Upload thất bại, đã lưu video vào bộ nhớ máy." : "Upload thất bại và không tự lưu được video. Bấm 'Lưu video xuống máy' để thử lại.",
-      { autoSaved: saved }
-    );
+    const errActions = [
+      { label:"🔁 Thử lại", cls:"indigo", fn:`hideToast();uploadVideoToDrive(recordedBlob||pendingBlob,'${trackingCodeValue}');` },
+      { label:"🗑 Bỏ", cls:"outline", fn:`recordedBlob=null;recordedChunks=[];hideToast();` }
+    ];
+    if (!saved) {
+      errActions.unshift({ label:"💾 Lưu xuống máy", cls:"red", fn:`saveVideoLocally(recordedBlob||pendingBlob,'${trackingCodeValue}');hideToast();` });
+    }
+    showToast({
+      icon:"⚠️",
+      title:`⚠️ Upload thất bại: ${trackingCodeValue}`,
+      sub: saved ? "Đã tự lưu vào Downloads." : "Chưa lưu được video.",
+      progress: -1,
+      actions: errActions
+    });
+    document.getElementById("toastSpinner").style.display = "none";
   } finally {
     isUploading = false;
   }
 }
 
-function updateProgress(pct){document.getElementById("progressBar").style.width=pct+"%";document.getElementById("progressText").innerText=pct+"%";}
 
-function enterDoneState(uploadResult){
-  appState="done";
-  document.getElementById("uploadGroup").style.display="none";
-  showEl("statusLine2",true);
-  document.getElementById("statusLine2").innerHTML=`✅ Đã lưu! Mã <strong>${pendingUploadTrackingCode}</strong><br><span style="font-size:12px;opacity:.7">Bấm "Quay video khác" để tiếp tục</span>`;
-  showEl("btnStopRecord",false);showEl("rowRetry",false);showEl("btnNewRecording",true);showEl("btnSaveLocalManual",false);
-  if(uploadResult&&uploadResult.driveUrl){document.getElementById("videoResultLink").href=uploadResult.driveUrl;showEl("videoResultLink",true);}
-  recordedBlob=null;recordedChunks=[];localSaveDone=false;
-}
-
-function enterErrorState(message,opts){
-  opts=opts||{};
-  appState="error";
-  document.getElementById("uploadGroup").style.display="none";
-  showEl("statusLine2",true);
-  const subText=opts.autoSaved?"Video đã được lưu vào thư mục Downloads trên máy.":"Video vẫn giữ trong bộ nhớ — bấm nút bên dưới để lưu hoặc thử lại.";
-  document.getElementById("statusLine2").innerHTML=`⚠️ ${message||"Lỗi không xác định"}<br><span style="font-size:12px;opacity:.7">${subText}</span>`;
-  showEl("btnStopRecord",false);showEl("rowRetry",true);showEl("btnNewRecording",false);showEl("btnSaveLocalManual",true);
-}
-
-document.getElementById("btnRetryUpload").addEventListener("click",()=>{
-  if(recordedBlob)uploadVideoToDrive(recordedBlob,pendingUploadTrackingCode);
-  else{alert("Không còn dữ liệu video. Vui lòng quay lại từ đầu.");enterScanningState();}
-});
-document.getElementById("btnDiscard").addEventListener("click",()=>{
-  if(confirm("Bỏ video này? Không thể khôi phục.")){recordedBlob=null;recordedChunks=[];currentTrackingCode="";localSaveDone=false;document.getElementById("actionOverlay").classList.remove("show");enterScanningState();}
-});
-document.getElementById("btnNewRecording").addEventListener("click",()=>{
-  currentTrackingCode="";recordedBlob=null;recordedChunks=[];localSaveDone=false;
-  document.getElementById("actionOverlay").classList.remove("show");
-  enterScanningState();
-});
 </script>
-<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v15072026-6</span></div>
+<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v19072026-1</span></div>
 </body>
 </html>
