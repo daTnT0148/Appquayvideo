@@ -344,6 +344,23 @@ window.addEventListener("beforeinstallprompt",(e)=>{e.preventDefault();deferredI
 document.getElementById("btnInstall").addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;document.getElementById("btnInstall").classList.remove("show");});
 window.addEventListener("appinstalled",()=>document.getElementById("btnInstall").classList.remove("show"));
 
+function formatDateDisplay(dateVal) {
+  if (!dateVal) return "N/A";
+  let d = new Date(dateVal);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleString("vi-VN", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  }
+  const s = String(dateVal).trim();
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[, ]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) {
+    const day = parseInt(m[1], 10), month = parseInt(m[2], 10) - 1, year = parseInt(m[3], 10);
+    const hour = parseInt(m[4], 10), min = parseInt(m[5], 10), sec = m[6] ? parseInt(m[6], 10) : 0;
+    d = new Date(year, month, day, hour, min, sec);
+    if (!isNaN(d.getTime())) return d.toLocaleString("vi-VN", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  }
+  return s;
+}
+
 // --- SETTINGS ---
 const DEFAULT_SETTINGS = { resolution: "720", fps: "30" };
 function loadSettings() {
@@ -530,7 +547,7 @@ async function loadRecentVideos() {
     if (data.ok && data.videos && data.videos.length > 0) {
       countEl.textContent = data.videos.length + " video";
       listEl.innerHTML = data.videos.map((v, i) => {
-        const dateStr = v.uploadDate ? new Date(v.uploadDate).toLocaleString("vi-VN", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "N/A";
+        const dateStr = formatDateDisplay(v.uploadDate);
         return `<div class="video-item">
           <div class="video-item-icon">🎬</div>
           <div class="video-item-info">
@@ -596,7 +613,7 @@ async function doSearch(){
     const res=await fetch(CONFIG.APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"searchVideo",key:CONFIG.SECRET_KEY,data:{trackingCode:code}})});
     const data=await res.json();
     if(data.ok){
-      const dateStr=data.uploadDate?new Date(data.uploadDate).toLocaleString("vi-VN"):"N/A";
+      const dateStr = formatDateDisplay(data.uploadDate);
       resEl.className="search-result-card found show";
       resEl.innerHTML=`<div class="status-badge">✅ Đã tìm thấy dữ liệu</div><br><div class="result-label">Mã vận đơn</div><div class="result-value">${data.trackingCode}</div><div class="result-label">Thời gian quay</div><div class="result-value" style="font-size:13px">${dateStr}</div><div style="display:flex;gap:10px;margin-top:14px;"><a href="${data.driveUrl}" target="_blank" class="result-drive-btn" style="flex:1;margin-top:0;">🔗 Xem / Tải</a><button onclick="deleteFoundVideo('${data.trackingCode}')" style="background:var(--red);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;">🗑 Xóa</button></div>`;
     }else{
@@ -1226,6 +1243,6 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
 
 
 </script>
-<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v19072026-1</span></div>
+<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v19072026-2</span></div>
 </body>
 </html>

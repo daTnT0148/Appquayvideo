@@ -132,11 +132,13 @@ function handleLogVideo(data) {
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(["Mã vận đơn", "Tên file", "Link Drive", "Ngày giờ upload"]);
     }
+    // Lưu ngày giờ dưới dạng ISO string để tránh sai format khi đọc lại
+    var dateToStore = data.uploadDate || new Date().toISOString();
     sheet.appendRow([
       data.trackingCode || "",
       data.fileName     || "",
       data.driveUrl     || "",
-      data.uploadDate   ? new Date(data.uploadDate).toLocaleString("vi-VN") : new Date().toLocaleString("vi-VN")
+      dateToStore
     ]);
     return json({ ok: true, driveUrl: data.driveUrl });
   } catch(err) {
@@ -160,7 +162,7 @@ function handleSearchVideo(data) {
           trackingCode : values[i][0],
           fileName     : values[i][1],
           driveUrl     : values[i][2],
-          uploadDate   : values[i][3]
+          uploadDate   : serializeDate(values[i][3])
         });
       }
     }
@@ -180,16 +182,14 @@ function handleGetRecentVideos(data) {
     var limit  = data.limit || 5;
     
     var recent = [];
-    // Đọc từ dưới lên, bắt đầu từ dòng cuối cùng của DataRange, bỏ qua dòng 1 (tiêu đề)
     for (var i = values.length - 1; i >= 1; i--) {
       var row = values[i];
-      // Chỉ lấy các dòng có mã vận đơn (không bị rỗng)
       if (String(row[0]).trim() !== "") {
         recent.push({
           trackingCode: row[0],
           fileName:     row[1],
           driveUrl:     row[2],
-          uploadDate:   row[3]
+          uploadDate:   serializeDate(row[3])
         });
         if (recent.length >= limit) break;
       }
@@ -255,3 +255,44 @@ function getSheet() {
   return ss.getSheetByName("Data") || ss.getSheetByName("Trang tính1") || ss.getSheetByName("Sheet1") || ss.getSheetByName("Trang tính 1") || ss.getSheets()[0]; 
 }
 function json(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
+
+/**
+ * serializeDate: chuẩn hoá giá trị ngày giờ về ISO string.
+ * Xử lý các trường hợp:
+ *  - Date object (Google Sheets trả về khi cell là Date)
+ *  - ISO string: "2026-07-11T01:30:47.000Z"
+ *  - Locale VN string: "11/07/2026 1:30:47" (DD/MM/YYYY HH:MM:SS)  ← dữ liệu cũ bị lưu sai
+ *  - Rỗng / null
+ */
+function serializeDate(val) {
+  if (!val) return null;
+  
+  // Nếu là Date object (Sheets trả về kiểu này khi cell được nhận dạng là Date)
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val.toISOString();
+  }
+  
+  var s = String(val).trim();
+  if (s === "" || s === "undefined" || s === "null") return null;
+  
+  // Thử parse thẳng (ISO format hoặc en-US format)
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString();
+  
+  // Thử parse dạng DD/MM/YYYY HH:MM:SS (locale VN — dữ liệu cũ bị lưu sai)
+  // Ví dụ: "11/07/2026 1:30:47" hoặc "11/07/2026, 1:30:47"
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[, ]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) {
+    var day   = parseInt(m[1], 10);
+    var month = parseInt(m[2], 10) - 1; // JS month 0-indexed
+    var year  = parseInt(m[3], 10);
+    var hour  = parseInt(m[4], 10);
+    var min   = parseInt(m[5], 10);
+    var sec   = m[6] ? parseInt(m[6], 10) : 0;
+    var parsed = new Date(year, month, day, hour, min, sec);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  
+  // Không parse được, trả về null để frontend hiển thị "Không rõ"
+  return null;
+}
