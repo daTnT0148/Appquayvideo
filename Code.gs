@@ -204,6 +204,21 @@ function handleSearchVideo(data) {
     for (var i = 1; i < values.length; i++) {
       var parsed = parseRow(values[i]);
       if (parsed.trackingCode === code) {
+        // Kiểm tra xem file Drive còn tồn tại không
+        var match = parsed.driveUrl.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+        if (match && match[1]) {
+          try {
+            var file = DriveApp.getFileById(match[1]);
+            if (file.isTrashed()) {
+              sheet.deleteRow(i + 1);
+              return json({ ok: false, error: "Video đã bị xóa trong Google Drive (Thùng rác)." });
+            }
+          } catch(e) {
+            sheet.deleteRow(i + 1);
+            return json({ ok: false, error: "Video không còn tồn tại trên Google Drive." });
+          }
+        }
+        
         return json({
           ok           : true,
           trackingCode : parsed.trackingCode,
@@ -229,11 +244,32 @@ function handleGetRecentVideos(data) {
     var limit  = data.limit || 5;
     
     var recent = [];
+    var checkedCount = 0;
+    
     for (var i = values.length - 1; i >= 1; i--) {
       var parsed = parseRow(values[i]);
       if (parsed.trackingCode !== "") {
-        recent.push(parsed);
-        if (recent.length >= limit) break;
+        checkedCount++;
+        if (checkedCount > 15) break; // Tránh check quá nhiều file bị xóa gây chậm/timeout API
+        
+        var isValid = true;
+        var match = parsed.driveUrl.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+        if (match && match[1]) {
+          try {
+            var file = DriveApp.getFileById(match[1]);
+            if (file.isTrashed()) isValid = false;
+          } catch(e) {
+            isValid = false; // File bị xóa vĩnh viễn hoặc mất quyền
+          }
+        }
+        
+        if (isValid) {
+          recent.push(parsed);
+          if (recent.length >= limit) break;
+        } else {
+          // Xóa luôn dòng này khỏi sheet vì video đã bị xóa trên Drive
+          sheet.deleteRow(i + 1);
+        }
       }
     }
     
@@ -253,8 +289,9 @@ function handleDeleteVideo(trackingCode) {
     var code   = String(trackingCode || "").trim();
 
     for (var i = 1; i < values.length; i++) {
-      if (String(values[i][0]).trim() === code) {
-        var driveUrl = String(values[i][2] || "");
+      var parsed = parseRow(values[i]);
+      if (parsed.trackingCode === code) {
+        var driveUrl = parsed.driveUrl;
         var match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
         if (match && match[1]) {
           try {
