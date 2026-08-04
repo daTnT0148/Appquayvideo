@@ -228,6 +228,26 @@ function handleSearchVideo(data) {
         });
       }
     }
+    // Nếu không tìm thấy trong sheet, thử tìm trực tiếp trên Drive (trường hợp bị mất log)
+    var files = DriveApp.getFolderById(DRIVE_FOLDER_ID).searchFiles("title contains '" + code + "' and trashed = false");
+    if (files.hasNext()) {
+      var file = files.next();
+      var fileName = file.getName();
+      var driveUrl = file.getUrl();
+      var uploadDate = file.getDateCreated().toISOString();
+      
+      // Tự động phục hồi lại vào Sheet
+      sheet.appendRow([fileName, code, uploadDate, "", file.getId(), driveUrl]);
+      
+      return json({
+        ok           : true,
+        trackingCode : code,
+        fileName     : fileName,
+        driveUrl     : driveUrl,
+        uploadDate   : uploadDate
+      });
+    }
+
     return json({ ok: false, error: "Không tìm thấy mã vận đơn." });
   } catch(err) {
     return json({ ok: false, error: err.toString() });

@@ -1219,6 +1219,64 @@ function hideToast(delay = 0) {
 
 document.getElementById("toastClose").addEventListener("click", () => hideToast());
 
+// ── Pending Log Queue (bảo vệ khi app bị tắt lúc ghi nhật ký) ───────────────
+const PENDING_LOG_KEY = "vbc_pending_logs";
+
+function savePendingLog(entry) {
+  try {
+    const logs = JSON.parse(localStorage.getItem(PENDING_LOG_KEY) || "[]");
+    const filtered = logs.filter(l => l.trackingCode !== entry.trackingCode);
+    filtered.push(entry);
+    localStorage.setItem(PENDING_LOG_KEY, JSON.stringify(filtered));
+  } catch(e) {}
+}
+
+function clearPendingLog(trackingCode) {
+  try {
+    const logs = JSON.parse(localStorage.getItem(PENDING_LOG_KEY) || "[]");
+    localStorage.setItem(PENDING_LOG_KEY, JSON.stringify(logs.filter(l => l.trackingCode !== trackingCode)));
+  } catch(e) {}
+}
+
+async function retryPendingLogs() {
+  let logs = [];
+  try { logs = JSON.parse(localStorage.getItem(PENDING_LOG_KEY) || "[]"); } catch(e) {}
+  if (!logs.length) return;
+
+  for (const entry of logs) {
+    try {
+      // 1. Kiểm tra xem log đã có trên sheet chưa (nếu lỡ ghi rồi nhưng chưa kịp xóa cache)
+      const checkRes = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: "POST", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "searchVideo", key: CONFIG.SECRET_KEY, data: { trackingCode: entry.trackingCode } })
+      });
+      const checkData = await checkRes.json().catch(() => ({ ok: false }));
+      if (checkData.ok) {
+        clearPendingLog(entry.trackingCode);
+        continue;
+      }
+      
+      // 2. Chưa có -> Tiến hành ghi bù
+      const logRes = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: "POST", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "logVideo", key: CONFIG.SECRET_KEY, data: entry })
+      });
+      const logData = await logRes.json().catch(() => ({ ok: false }));
+      if (logData.ok) {
+        clearPendingLog(entry.trackingCode);
+        showToast({ icon:"✅", title:`Đã phục hồi: ${entry.trackingCode}`, sub:"Nhật ký bị gián đoạn đã được lưu lại.", progress:100 });
+        setTimeout(() => hideToast(), 4000);
+        loadRecentVideos();
+      }
+    } catch(e) {
+      console.warn("[PendingLog] Retry thất bại:", entry.trackingCode, e);
+    }
+  }
+}
+
+// Chạy tự động lúc app mở lên
+window.addEventListener("load", retryPendingLogs);
+
 // ── Hàm upload chính ─────────────────────────────────────────────────────────
 let isUploading = false;
 
@@ -1260,10 +1318,17 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
       if (i === totalChunks - 1) driveFileId = res.fileId;
     }
 
-    // 3. Ghi log
+    // 3. Lưu pending log vào localStorage TRƯỚC KHI gọi API
+    //    → Nếu app bị tắt trong bước này, lần mở lại sẽ tự retry
+    const driveUrl = `https://drive.google.com/file/d/${driveFileId}/view`;
+    const pendingEntry = { trackingCode: trackingCodeValue, fileName, driveUrl, uploadDate: uploadDateIso };
+    savePendingLog(pendingEntry);
+
     showToast({ icon:"spinner", title:`Đang upload: ${trackingCodeValue}`, sub:"Đang ghi nhật ký...", progress:100 });
     const logResult = await logVideoToSheet(trackingCodeValue, fileName, driveFileId, uploadDateIso);
-    const driveUrl = logResult.driveUrl || (driveFileId ? `https://drive.google.com/file/d/${driveFileId}/view` : null);
+
+    // Ghi thành công → xóa pending
+    clearPendingLog(trackingCodeValue);
 
     releaseWakeLock();
     recordedBlob = null; recordedChunks = []; localSaveDone = false;
@@ -1304,6 +1369,6 @@ async function uploadVideoToDrive(blob, trackingCodeValue) {
 
 
 </script>
-<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v01082026-1</span></div>
+<div style="text-align:center;font-size:11px;color:var(--text-dim);padding:10px 0;">Phi&#234;n b&#7843;n: <span id="app-version">v04082026-1</span></div>
 </body>
 </html>
